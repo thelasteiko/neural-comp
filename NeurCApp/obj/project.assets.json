@@ -13,11 +13,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\temp\\neural-comp\\NercLib\\NercLib.csproj",
-      "projectName": "NercLib",
-      "projectPath": "c:\\temp\\neural-comp\\NercLib\\NercLib.csproj",
+      "projectUniqueName": "c:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj",
+      "projectName": "NeurCApp",
+      "projectPath": "c:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj",
       "packagesPath": "C:\\Users\\memre\\.nuget\\packages\\",
-      "outputPath": "c:\\temp\\neural-comp\\NercLib\\obj\\",
+      "outputPath": "c:\\temp\\neural-comp\\NeurCApp\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\memre\\AppData\\Roaming\\NuGet\\NuGet.Config"
