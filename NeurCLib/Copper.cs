@@ -1,7 +1,4 @@
-﻿using System;
-using System.Reflection.Metadata;
-using System.IO.Ports;
-using System.Timers;
+﻿using System.IO.Ports;
 
 namespace NeurCLib;
 
@@ -147,12 +144,15 @@ public class Copper {
   /// </summary>
   public void start() {
     ticker.Start();
+    Console.WriteLine("Ticker started");
   }
   /// <summary>
   /// Controlled stop, closes the connection.
   /// </summary>
   public void stop() {
     _state = State.Stop;
+    ticker.Stop();
+    porter.Close();
   }
   /// <summary>
   /// Executes at each timeout of the ticker.
@@ -163,6 +163,7 @@ public class Copper {
   /// <param name="sender"></param>
   /// <param name="e"></param>
   private void tick(object? sender, System.Timers.ElapsedEventArgs e) {
+    Console.WriteLine("tick");
     Package p = new Package();
     if (state == State.Stop) {
       porter.Close();
@@ -173,16 +174,20 @@ public class Copper {
       porter.Open();
       _state = State.Connecting;
       ticker.Start();
+      Console.WriteLine($"Connection opening: {state.ToString()}");
       return;
-    } else if (_state == State.Connecting) {
+    } else if (state == State.Connecting) {
       // port is open so send initial packet
+      Console.WriteLine("Initial");
       p.initial();
-    } else if (_state == State.Running) {
+      Console.WriteLine("Initial");
+    } else if (state == State.Running) {
       // send keepalive
       p.keepalive();
+      Console.WriteLine("Keepalive");
     } else {
       // I did something weird
-      Console.WriteLine($"Unexpected state '{nameof(_state)}' exiting.");
+      Console.WriteLine($"Unexpected state '{state.ToString()}' exiting.");
       _state = State.Error;
       return;
     }
@@ -196,6 +201,7 @@ public class Copper {
       // response not received; reset to connect
       _state = State.Connecting;
       ticker.Start();
+      Console.WriteLine("Timeout");
       return;
     } catch (ArgumentException e2) {
       // I did something wrong...probably
@@ -215,6 +221,7 @@ public class Copper {
     if (state != State.Error) {
       ticker.Start();
     }
+    Console.WriteLine($"end: {state.ToString()}");
   }
   private void handleError(byte[] ray) {
     Package p = new Package();
@@ -228,7 +235,7 @@ public class Copper {
     report += errorType switch {
       ErrorType.BadChecksum => "Bad checksum: " + ((int)p.checksum).ToString(),
       ErrorType.TooLong => "Payload is too long: " + ((int)p.payloadSize).ToString() + " <> " + p.payload.Length.ToString(),
-      _ => throw new ArgumentOutOfRangeException(nameof(errorType), $"Unexpected error: {nameof(errorType)}")
+      _ => throw new ArgumentOutOfRangeException(errorType.ToString(), $"Unexpected error: {errorType.ToString()}")
     };
     Console.WriteLine(report);
   }
