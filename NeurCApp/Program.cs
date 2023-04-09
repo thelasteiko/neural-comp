@@ -1,13 +1,20 @@
 ﻿using NeurCLib;
 
-Console.WriteLine("Starting....");
+Log.instance(Log.Levels.Debug);
+Log.sys("Log initialized. Starting...");
 
-Copper cop = new Copper();
+Copper cop = new Copper(debug:false);
 
-Console.WriteLine($"State is: {cop.state.ToString()}");
-Console.WriteLine("Starting connection...");
+Console.CancelKeyPress += delegate {
+  cop.stop();
+};
+
+Log.debug($"State is: {cop.state.ToString()}");
+Log.sys("Starting connection...");
 
 cop.start();
+
+Log.sys("Type q+ENTER to quit.");
 
 String? stop = "";
 do {
@@ -15,6 +22,6 @@ do {
   if (stop == null) {
     stop = "";
   }
-} while (!stop.ToLower().StartsWith('y'));
+} while (!stop.ToLower().StartsWith('q'));
 
 cop.stop();
