@@ -1,0 +1,11 @@
+*.pdb
+
+NeurCApp/bin/*
+NeurCApp/obj/Debug/net6.0/*.cache
+NeurCApp/obj/Debug/net6.0/*.dll
+NeurCApp/obj/*.cache
+
+NeurCLib/bin/*
+NeurCLib/obj/Debug/net6.0/*.cache
+NeurCLib/obj/Debug/net6.0/*.dll
+NeurCLib/obj/*.cache

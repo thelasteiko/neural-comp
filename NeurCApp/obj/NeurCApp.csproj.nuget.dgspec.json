@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "c:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj": {}
+    "C:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj": {}
   },
   "projects": {
-    "c:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj": {
+    "C:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "c:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj",
+        "projectUniqueName": "C:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj",
         "projectName": "NeurCApp",
-        "projectPath": "c:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj",
+        "projectPath": "C:\\temp\\neural-comp\\NeurCApp\\NeurCApp.csproj",
         "packagesPath": "C:\\Users\\memre\\.nuget\\packages\\",
-        "outputPath": "c:\\temp\\neural-comp\\NeurCApp\\obj\\",
+        "outputPath": "C:\\temp\\neural-comp\\NeurCApp\\obj\\",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "C:\\Users\\memre\\AppData\\Roaming\\NuGet\\NuGet.Config"

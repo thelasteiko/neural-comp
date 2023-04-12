@@ -22,7 +22,7 @@ namespace NeurCLib {
 
   }
   /// <summary>
-  /// Porter is a test class for debugging.
+  /// PseudoPorter is a test class for debugging.
   /// </summary>
   public class PseudoPorter : IPorter {
     private String _PortName = "COM3";

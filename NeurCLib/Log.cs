@@ -161,8 +161,6 @@ namespace NeurCLib {
       if (buffer.Length == 0) return "";
       StringBuilder sb = new StringBuilder();
       // 00 00 00 00 00  00 00 00 00 00  00 00 00 00 00  00 00 00 00 00
-      // int section = 1;
-      // int row = 0;
       sb.Append(buffer[0].ToString("X2"));
       for (int i = 1; i < buffer.Length; i++) {
         sb.Append(" ");
@@ -174,22 +172,6 @@ namespace NeurCLib {
           }
         }
         sb.Append(buffer[i].ToString("X2"));
-        // if (section < 5) {
-        //   sb.Append(" ");
-        //   sb.Append(buffer[i].ToString("X2"));
-        //   section++;
-        // } else if (row < 5) {
-        //   section = 0;
-        //   sb.Append("  ");
-        //   sb.Append(buffer[i].ToString("X2"));
-        //   row++;
-        // } else {
-        //   // end of section and row
-        //   section = 0;
-        //   row = 0;
-        //   sb.Append("\n");
-        //   sb.Append(buffer[i].ToString("X2"));
-        // }
       }
       return sb.ToString();
     }

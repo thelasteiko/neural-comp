@@ -1,9 +1,9 @@
 ﻿using NeurCLib;
 
-Log.instance(Log.Levels.Debug);
+Log.instance(Log.Levels.SysMsg);
 Log.sys("Log initialized. Starting...");
 
-Copper cop = new Copper(debug:true);
+Copper cop = new Copper(debug:false);
 
 Console.CancelKeyPress += delegate {
   cop.stop();
@@ -23,6 +23,12 @@ do {
   stop = Console.ReadLine();
   if (stop == null) {
     stop = "";
+  }
+  if (cop.state == Copper.State.Error) {
+    Log.warn("Entered error state, exiting...");
+    cop.stop();
+    // TODO add actual error codes
+    Environment.Exit(1);
   }
 } while (!stop.ToLower().StartsWith('q'));
 
