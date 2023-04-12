@@ -82,15 +82,16 @@ public class Copper {
       _state = State.Connecting;
       ticker.Start();
       Log.debug($"Connection opening: {state.ToString()}");
+      Log.sys("Opening port " + porter.PortName);
       return;
     } else if (state == State.Connecting) {
       // port is open so send initial packet
-      Log.debug("Initial");
+      Log.sys("Port open, sending connection request.");
       p.initial();
     } else if (state == State.Running) {
       // send keepalive
+      Log.sys("Connection open, sending keepalive.");
       p.keepalive();
-      Log.debug("Keepalive");
     } else {
       // I did something weird
       Log.critical($"Unexpected state '{state.ToString()}' exiting.");
@@ -113,7 +114,7 @@ public class Copper {
       // response not received; reset to connect
       _state = State.Connecting;
       ticker.Start();
-      Log.warn("Connection Timeout: " + porter.ReadTimeout.ToString());
+      Log.warn("Port connection Timeout: " + porter.ReadTimeout.ToString());
       return;
     } catch (ArgumentException e2) {
       // I did something wrong...probably
@@ -121,14 +122,14 @@ public class Copper {
       Log.critical("{0}: {1}", e2.GetType().Name, e2.Message);
       return;
     }
-    
     if (p.isEqual(ray)) {
       // request success
+      Log.sys("Still Alive");
       _state = State.Running;
     } else {
       // received error
       handleError(ray);
-      Log.debug("Original: ", p.toStream());
+      Log.debug("Original:", p.toStream());
       Log.debug("Error ray:", ray);
       _state = State.Error;
     }

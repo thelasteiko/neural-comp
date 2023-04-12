@@ -68,7 +68,7 @@ namespace NeurCLib {
     /// <summary>
     /// The last message the pseudo port received.
     /// </summary>
-    private byte[] LastMessage;
+    private byte[] LastMessage = new byte[0];
 
     public void Open() {
       IsOpen = true;

@@ -9,3 +9,6 @@ C:\..\neural-comp> dotnet build "NeurCLib\NeurCLib.csproj"
 C:\..\neural-comp> dotnet run --project "NeurCApp\NeurCApp.csproj"
 ```
 
+## Notes
+
+The app just links to the dll in the debug folder of the library.
