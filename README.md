@@ -1,6 +1,9 @@
 # NeurC
 Library and application for the Neural Computation project.
 
+* NeurCLib: The API portion
+* NeurCApp: The command line application
+
 ## Usage
 This project was made with Visual Studio Code. If all else fails, the following commands can be run from the command line.
 
@@ -11,4 +14,4 @@ C:\..\neural-comp> dotnet run --project "NeurCApp\NeurCApp.csproj"
 
 ## Notes
 
-The app just links to the dll in the debug folder of the library.
+The app just links to the dll in the debug folder of the library. Make sure to build the library before you try to run the app.
