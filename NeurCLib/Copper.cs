@@ -6,22 +6,35 @@ namespace NeurCLib;
 /// Base class for pinging the arduino. Will probably move things later.
 /// </summary>
 public class Copper {
+  /// <summary>
+  /// Tracks the state the Copper is in.
+  /// </summary>
   public enum State {
     Closed,
     Connecting,
     Running,
-    Stop,
     Error
   }
+  /// <summary>
+  /// Timer that triggers the tick function.
+  /// </summary>
   private System.Timers.Timer ticker;
+  /// <summary>
+  /// State that the Copper is in. Used to determine what to
+  /// do during tick.
+  /// </summary>
   private State _state = State.Closed;
   public State state {
     get => _state;
   }
+  /// <summary>
+  /// The serial port object. Using a wrapper for trading out with
+  /// a test object.
+  /// </summary>
   private IPorter porter;
   public Copper(Boolean debug=false) {
     if (debug) {
-      porter = new Porter();
+      porter = new PseudoPorter();
     } else {
       porter = new PortWrapper();
     }
@@ -119,11 +132,17 @@ public class Copper {
       Log.debug("Error ray:", ray);
       _state = State.Error;
     }
+    // if we aren't in error and we haven't restarted, restart
     if (state != State.Error) {
       ticker.Start();
     }
     Log.debug($"End tick: {state.ToString()}");
   }
+  /// <summary>
+  /// Handle an error thrown by the arduino. Reads the error
+  /// and prints an error message.
+  /// </summary>
+  /// <param name="ray">Output from arduino</param>
   private void handleError(byte[] ray) {
     Package p = new Package();
     p.fromStream(ray);

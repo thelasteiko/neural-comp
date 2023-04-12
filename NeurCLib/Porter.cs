@@ -1,7 +1,10 @@
 using System.IO.Ports;
 
 namespace NeurCLib {
-
+  /// <summary>
+  /// Interface for the serial port. This allows the Copper to switch
+  /// between a pseudo port for testing and an actual SerialPort.
+  /// </summary>
   public interface IPorter {
     public string PortName {get;set;}
     public int BaudRate {get;set;}
@@ -21,7 +24,7 @@ namespace NeurCLib {
   /// <summary>
   /// Porter is a test class for debugging.
   /// </summary>
-  public class Porter : IPorter {
+  public class PseudoPorter : IPorter {
     private String _PortName = "COM3";
     public String PortName {
       get => _PortName;
@@ -62,7 +65,9 @@ namespace NeurCLib {
       get => _IsOpen;
       set => _IsOpen = value;
     }
-
+    /// <summary>
+    /// The last message the pseudo port received.
+    /// </summary>
     private byte[] LastMessage;
 
     public void Open() {
@@ -90,7 +95,7 @@ namespace NeurCLib {
   }
   /// <summary>
   /// The PortWrapper wraps a SerialPort so I can easily switch this out
-  /// with the test class Porter.
+  /// with the test class.
   /// </summary>
   public class PortWrapper : IPorter {
     private SerialPort sporter = new SerialPort();

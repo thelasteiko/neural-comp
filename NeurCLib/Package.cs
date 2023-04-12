@@ -1,7 +1,7 @@
 
 using System.Text;
 namespace NeurCLib {
-  // baudrate / 10 = byte rate
+  
   enum PackType {
     Failure = 0,
     Transaction,
@@ -13,10 +13,16 @@ namespace NeurCLib {
   }
 /// <summary>
 /// Definition for the packet data and associated functions.
-/// Provides standard factory functions for each type of packet.
+/// Provides utility functions to manage and print info.
 /// </summary>
   public class Package {
+    /// <summary>
+    /// Minimum possible size, if the payload length is 0.
+    /// </summary>
     public const int MIN_SIZE = 7;
+    /// <summary>
+    /// I got this from the arduino code
+    /// </summary>
     public const int MAX_PAYLOAD_SIZE = 249;
     public byte[] headerSync;
     public byte packetType;
@@ -31,6 +37,10 @@ namespace NeurCLib {
       this.payloadSize = (byte)size;
       this.payload = new byte[payloadSize];
     }
+    /// <summary>
+    /// Print some values for debugging.
+    /// </summary>
+    /// <returns></returns>
     public override string ToString() {
       StringBuilder sb = new StringBuilder("[");
       sb.Append("headerSync=" + headerSync.Length);
@@ -45,7 +55,7 @@ namespace NeurCLib {
     /// <summary>
     /// Concatenate the package into a byte array.
     /// </summary>
-    /// <returns></returns>
+    /// <returns>Byte array ready for the serial port</returns>
     public byte[] toStream() {
       byte[] ray = new byte[this.length()];
       headerSync.CopyTo(ray, 0);
@@ -60,7 +70,7 @@ namespace NeurCLib {
     /// Read in a byte array and set values based on it.
     /// If the byte array length is less than the MIN_SIZE, no values are set.
     /// </summary>
-    /// <param name="ray"></param>
+    /// <param name="ray">Should be the response packet from the arduino</param>
     public void fromStream(byte[] ray) {
       if (ray.Length < MIN_SIZE) return;
       headerSync = new byte[] {ray[0], ray[1], ray[2]};
@@ -90,6 +100,12 @@ namespace NeurCLib {
     public int length() {
       return MIN_SIZE + payloadSize;
     }
+    /// <summary>
+    /// Checks if the values in the byte array are the same as the object.
+    /// Used for checking against the response packet.
+    /// </summary>
+    /// <param name="ray"></param>
+    /// <returns></returns>
     public bool isEqual(byte[] ray) {
       if (this.length() > ray.Length) return false;
       byte[] meray = this.toStream();
@@ -108,7 +124,9 @@ namespace NeurCLib {
     /// </summary>
     /// <returns></returns>
     public void initial() {
-      this.payload[0] = 0x01;
+      this.payload = new byte[]{0x01};
+      payloadSize = 1;
+      this.packetType = (byte)PackType.Transaction;
       this.checkMe();
     }
     /// <summary>
@@ -116,7 +134,9 @@ namespace NeurCLib {
     /// </summary>
     /// <returns></returns>
     public void keepalive() {
-      payload[0] = 0x02;
+      payload = new byte[]{0x02};
+      payloadSize = 1;
+      this.packetType = (byte)PackType.Transaction;
       checkMe();
     }
   }
