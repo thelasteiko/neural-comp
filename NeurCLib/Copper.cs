@@ -28,6 +28,14 @@ public class Copper {
     get => _state;
   }
   /// <summary>
+  /// How many times we get a timeout before we quit trying.
+  /// </summary>
+  private int timeout_timeout = 3;
+  /// <summary>
+  /// The current amount of timeouts.
+  /// </summary>
+  private int timeout_count = 0;
+  /// <summary>
   /// The serial port object. Using a wrapper for trading out with
   /// a test object.
   /// </summary>
@@ -93,7 +101,7 @@ public class Copper {
       Log.sys("Connection open, sending keepalive.");
       p.keepalive();
     } else {
-      // I did something weird
+      // something weird happened
       Log.critical($"Unexpected state '{state.ToString()}' exiting.");
       _state = State.Error;
       return;
@@ -113,20 +121,29 @@ public class Copper {
     catch (TimeoutException) {
       // response not received; reset to connect
       _state = State.Connecting;
-      ticker.Start();
       Log.warn("Port connection Timeout: " + porter.ReadTimeout.ToString());
-      return;
+      timeout_count++;
+      if (timeout_count >= timeout_timeout) {
+        _state = State.Error;
+        Log.critical("Reached connection attempt limit.");
+        this.stop();
+        Environment.Exit(1);
+      } else {
+        ticker.Start();
+        return;
+      }
     } catch (ArgumentException e2) {
       // I did something wrong...probably
       _state = State.Error;
       Log.critical("{0}: {1}", e2.GetType().Name, e2.Message);
       return;
     }
+    timeout_count = 0;
     if (p.isEqual(ray)) {
       // request success
       Log.sys("Still Alive");
       _state = State.Running;
-    } else {
+    } else if (state != State.Error) {
       // received error
       handleError(ray);
       Log.debug("Original:", p.toStream());
