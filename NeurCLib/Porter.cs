@@ -19,12 +19,20 @@ namespace NeurCLib {
     public void Close();
     public void Write(byte[] buffer, int offset, int count);
     public int Read(byte[] buffer, int offset, int count);
-
+    public int ReadByte();
+    public void DiscardInBuffer();
+    public void DiscardOutBuffer();
   }
   /// <summary>
   /// PseudoPorter is a test class for debugging.
+  /// The port must:
+  /// Open and close
+  /// Receive connection request and set connected state
+  /// Timeout after 8 seconds unless keepalive received after connection request
+  /// Reset after 60 seconds
   /// </summary>
   public class PseudoPorter : IPorter {
+    #region parameters
     private String _PortName = "COM3";
     public String PortName {
       get => _PortName;
@@ -65,10 +73,31 @@ namespace NeurCLib {
       get => _IsOpen;
       set => _IsOpen = value;
     }
+    #endregion
     /// <summary>
     /// The last message the pseudo port received.
     /// </summary>
     private byte[] LastMessage = new byte[0];
+    private int current_index = 0;
+    private DateTime last_reset;
+    private Boolean IsConnected = false;
+    private Object locket = new();
+    private System.Timers.Timer ticker = new System.Timers.Timer(8000);
+
+    public PseudoPorter() {
+      last_reset = DateTime.Now;
+      ticker.Elapsed += tick;
+      ticker.AutoReset = true;
+      ticker.Start();
+    }
+    private void tick(object? sender, System.Timers.ElapsedEventArgs e) {
+      // reset connection unless watchdog has been reset
+      lock (locket) {
+        if ((DateTime.Now - last_reset).Milliseconds > 8000) {
+          IsConnected = false;
+        }
+      }
+    }
 
     public void Open() {
       IsOpen = true;
@@ -81,15 +110,42 @@ namespace NeurCLib {
     public void Write(byte[] buffer, int offset, int count) {
       // string.join(' ', buffer.Select(b => b.ToString('X2')))
       Log.debug($"Message Written [{offset}, {count}]:", buffer);
-      LastMessage = buffer;
+      lock (locket) {
+        if (Package.IsInitial(buffer)) IsConnected = true;
+        else if (IsConnected && Package.IsKeepalive(buffer))
+          last_reset = DateTime.Now;
+        else throw new TimeoutException("Missing initial connection");
+        LastMessage = buffer;
+        current_index = 0;
+      }
     }
     public int Read(byte[] buffer, int offset, int count) {
       int min = Math.Min(buffer.Length, LastMessage.Length);
-      for (int i = offset; i < min; i++) {
-        buffer[i] = LastMessage[i];
-      }
       Log.debug($"Message Read [{offset}, {count}]", buffer);
-      return count;
+      lock (locket) {
+        if (!IsConnected) throw new TimeoutException("Not connected");
+        for (int i = offset; i < min; i++) {
+          buffer[i] = LastMessage[i];
+        }
+      }
+      return min;
+    }
+    public int ReadByte() {
+      if (LastMessage.Length > 0) {
+        byte b = LastMessage[current_index];
+        Log.debug("Reading next byte: " + b.ToString("X2"));
+        current_index += 1;
+        return b;
+      }
+      return 0;
+    }
+    public void DiscardInBuffer() {
+      LastMessage = new byte[0];
+      current_index = 0;
+    }
+    public void DiscardOutBuffer() {
+      LastMessage = new byte[0];
+      current_index = 0;
     }
     // TODO simulate timeout and errors
   }
@@ -99,6 +155,7 @@ namespace NeurCLib {
   /// </summary>
   public class PortWrapper : IPorter {
     private SerialPort sporter = new SerialPort();
+    #region parameters
     public String PortName {
       get => sporter.PortName;
       set => sporter.PortName = value;
@@ -130,6 +187,7 @@ namespace NeurCLib {
     public Boolean IsOpen {
       get => sporter.IsOpen;
     }
+    #endregion
     public void Open() {
       sporter.Open();
     }
@@ -141,6 +199,15 @@ namespace NeurCLib {
     }
     public int Read(byte[] buffer, int offset, int count) {
       return sporter.Read(buffer, offset, count);
+    }
+    public int ReadByte() {
+      return sporter.ReadByte();
+    }
+    public void DiscardInBuffer() {
+      sporter.DiscardInBuffer();
+    }
+    public void DiscardOutBuffer() {
+      sporter.DiscardOutBuffer();
     }
   }
 }
