@@ -188,6 +188,7 @@ namespace NeurCLib {
       get => sporter.IsOpen;
     }
     #endregion
+    
     public void Open() {
       sporter.Open();
     }

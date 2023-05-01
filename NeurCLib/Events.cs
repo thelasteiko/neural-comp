@@ -18,7 +18,7 @@ public class StreamEventArgs : EventArgs {
   public ushort microvolts;
   public StreamEventArgs(byte[] payload) {
     // first 4 are timestamp
-    timestamp = BinaryPrimitives.ReadUInt64LittleEndian(payload);
+    timestamp = BinaryPrimitives.ReadUInt32LittleEndian(payload);
     // last 2 is neural data
     microvolts = BinaryPrimitives.ReadUInt16LittleEndian(payload.Skip(4).ToArray());
   }
@@ -92,6 +92,7 @@ internal static class Ext {
     int count = delegates.Length;
     Exception? exception = null;
     
+    Log.debug($"Triggering for {count} delegates");
     foreach (var d in delegates) {
       var async = d.Method.GetCustomAttributes(typeof(AsyncStateMachineAttribute), false).Any();
       

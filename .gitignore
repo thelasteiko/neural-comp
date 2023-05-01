@@ -12,3 +12,5 @@ NeurCLib/obj/*.cache
 
 NeurCLib/obj/Debug/net6.0/NeurCLib.GeneratedMSBuildEditorConfig.editorconfig
 NeurCLib/obj/NeurCLib.csproj.nuget.dgspec.json
+
+*.csv

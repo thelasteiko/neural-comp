@@ -77,6 +77,8 @@ internal class Keepalive : TaskEngine {
   private Mutex return_lock = new();
   private bool last_returned = true;
   public Keepalive(Controller ctrl) : base(ctrl, TE_KEEPALIVE) {
+    last_keepalive = 0;
+    last_returned = true;
   }
   protected override void runner() {
     if (!last_returned) {
@@ -85,7 +87,7 @@ internal class Keepalive : TaskEngine {
       return;
     }
     Package p = new(PackType.Transaction, OpCode.Keepalive);
-    Log.debug("Sending keepalive.");
+    // Log.debug("Sending keepalive.");
     controller.Write(p.toStream(), p.length);
     
     lock(return_lock) {
@@ -117,7 +119,7 @@ internal class Listener : TaskEngine {
   protected override void runner() {
     // while state alive
       PackFactory pf = new();
-      Log.debug("Starting new read.");
+      // Log.debug("Starting new read.");
       try {
         // probably the package is ready but not breaking out
         while (!pf.IsReady) {
@@ -140,7 +142,7 @@ internal class Listener : TaskEngine {
       }
       timeout_count = 0;
       // got a valid packet
-      Log.debug("Packet valid, queueing");
+      // Log.debug("Packet valid, queueing");
       controller.que.Enqueue(pf.pack);
   }
 }
@@ -202,6 +204,7 @@ internal class Consumer : TaskEngine {
         #pragma warning restore CS8600, CS8602
       }
     } else if (opc == OpCode.StartStream || opc == OpCode.StopStream) {
+      // Log.debug("Command:", p.toStream());
       Commander.sync(p);
     }
   }
@@ -211,8 +214,10 @@ internal class Consumer : TaskEngine {
       Log.warn("Bad checksum on stream packet.");
       Log.debug("Packet: " + p.ToString(), p.toStream());
     }
+    Log.debug("Stream data:", p.toStream());
     // payload is the data
     StreamEventArgs args = new(p.payload);
+    Log.debug("After args");
     controller.handleOnStream(args);
     // also save result to log file
     FileLog.write(args);
@@ -226,7 +231,7 @@ internal class Commander : TaskEngine {
   /// <summary>
   /// Only one command can be sent at a time.
   /// </summary>
-  private static int last_command;
+  private static int last_command = 0;
   private static Mutex return_lock = new();
   private static bool last_returned = true;
   private static Package? return_package = null;
@@ -235,7 +240,7 @@ internal class Commander : TaskEngine {
     wait_interval = 500;
     wait_timeout = 3;
   }
-  protected override async void runner() {
+  protected override void runner() {
     // set to kill right away
     _state = TaskState.KillOrder;
     if (!last_returned) {
@@ -252,27 +257,26 @@ internal class Commander : TaskEngine {
       last_command = (int)p.packetID;
       last_returned = false;
     }
-    await Task.Factory.StartNew(() => {
-      int c = 0;
-      while (!last_returned && c < wait_timeout) {
-        Thread.Sleep(wait_interval);
-        c++;
+    
+    int c = 0;
+    while (!last_returned && c < wait_timeout) {
+      Thread.Sleep(wait_interval);
+      c++;
+    }
+    if (!last_returned || return_package is null) {
+      Log.sys("Request not honored.");
+      return;
+    }
+    lock (return_lock) {
+      OpCode oc = (OpCode)return_package.payload[0];
+      if (oc == OpCode.StartStream) {
+        controller._IsStreaming = true;
+        FileLog.create();
+      } else if (oc == OpCode.StopStream) {
+        controller._IsStreaming = false;
+        FileLog.close();
       }
-      if (!last_returned || return_package is null) {
-        Log.sys("Request not honored.");
-        return;
-      }
-      lock (return_lock) {
-        OpCode oc = (OpCode)p.payload[0];
-        if (oc == OpCode.StartStream) {
-          controller._IsStreaming = true;
-          FileLog.create();
-        } else if (oc == OpCode.StopStream) {
-          controller._IsStreaming = false;
-          FileLog.close();
-        }
-      }
-    });
+    }
   }
   public static void sync(Package p) {
     lock (return_lock) {

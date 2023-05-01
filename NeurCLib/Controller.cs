@@ -19,7 +19,15 @@ public class Controller : IDisposable {
     Stopping,
     Error
   }
+  /// <summary>
+  /// Determines the timeout for reading from the port, and the time
+  /// interval for sending keepalive packets.
+  /// </summary>
   internal const int MAX_TIMEOUT = 5000;
+  /// <summary>
+  /// Mutex for writing to the serial port.
+  /// </summary>
+  /// <returns></returns>
   internal System.Threading.Mutex write_mutex = new();
   internal IPorter porter;
   /// <summary>
@@ -67,6 +75,10 @@ public class Controller : IDisposable {
       tsk.Value.Kill();
     }
   }
+  /// <summary>
+  /// Indicates whether there are any tasks in the task bag still alive.
+  /// </summary>
+  /// <returns></returns>
   internal bool IsAlive() {
     return task_bag.Count > 0;
   }
@@ -82,7 +94,7 @@ public class Controller : IDisposable {
   /// </summary>
   public int KillTimeout = 1000;
   internal System.Threading.Mutex stream_lock = new();
-  private bool __IsStreaming;
+  private bool __IsStreaming = false;
   internal bool _IsStreaming {
     get => __IsStreaming;
     set {
@@ -96,6 +108,11 @@ public class Controller : IDisposable {
   /// <value></value>
   public bool IsStreaming {get => _IsStreaming;}
   private bool disposed = false;
+  /// <summary>
+  /// Creates a new controller for interacting with the arduino.
+  /// Creates but does not open the serial port.
+  /// </summary>
+  /// <param name="debug"></param>
   public Controller(bool debug=false) {
     if (debug) {
       porter = new PseudoPorter();
@@ -107,8 +124,10 @@ public class Controller : IDisposable {
     porter.StopBits = StopBits.One;
     porter.Parity = Parity.None;
     porter.WriteTimeout = 500;
-    porter.ReadTimeout = MAX_TIMEOUT;
+    porter.ReadTimeout = MAX_TIMEOUT / 2;
 
+    _IsStreaming = false;
+    disposed = false;
     _status = ControlState.Created;
   }
   public event EventHandler<StreamEventArgs>? Stream;
@@ -116,14 +135,16 @@ public class Controller : IDisposable {
   /// Opens and connects to the arduino, then starts the keepalive,
   /// listening, and consumming threads.
   /// </summary>
-  public void start() {
-    if (porter.IsOpen) porter.Close();
-    if (connect()) {
-      _status = ControlState.Opened;
-      Log.debug("Connection successful, starting subtasks.");
-      spawnTasks();
-      _status = ControlState.Running;
-    }
+  public async Task start() {
+    await Task.Factory.StartNew(() => {
+      if (porter.IsOpen) porter.Close();
+      if (connect()) {
+        _status = ControlState.Opened;
+        Log.debug("Connection successful, starting subtasks.");
+        spawnTasks();
+        _status = ControlState.Running;
+      }
+    });
   }
   /// <summary>
   /// Creates independent threads for each task.
@@ -203,6 +224,12 @@ public class Controller : IDisposable {
     }
     return false;
   }
+  /// <summary>
+  /// Sends the kill order to all threads and waits for a bit.
+  /// If the threads take longer to exit than the KillTimeout,
+  /// continues anyway.
+  /// </summary>
+  /// <returns></returns>
   private async Task KillAll() {
     SendKill();
     await Task.Factory.StartNew(() => {
@@ -212,7 +239,7 @@ public class Controller : IDisposable {
         Thread.Sleep(1);
       }
       if (IsAlive())
-        Log.critical("Old tasks still running. Queue: " + que.Count);
+        Log.warn("Old tasks still running. Queue: " + que.Count);
     });
   }
   /// <summary>
@@ -223,16 +250,16 @@ public class Controller : IDisposable {
   private async void reconnect(Task tsk) {
     _status = ControlState.Restart;
     await KillAll();
-    // reconnect
-    if (porter is null || !porter.IsOpen) {
-      // TODO probably want to throw an error here
-      Log.critical("Port connection not open., attempting restart.");
-      _status = ControlState.Error;
-      start();
-      return;
-    }
     Log.sys("Waiting for component reset.");
     await doAWait();
+    // reconnect
+    while (porter is null || !porter.IsOpen) {
+      // TODO probably want to throw an error here
+      Log.critical("Port connection not open, attempting restart.");
+      _status = ControlState.Error;
+      await start();
+      return;
+    }
     if (sendConnect()) {
       spawnTasks();
       if (IsStreaming) {
@@ -246,7 +273,10 @@ public class Controller : IDisposable {
       _status = ControlState.Error;
     }
   }
-
+  /// <summary>
+  /// Helper that pauses an awaiting thread for 5 seconds.
+  /// </summary>
+  /// <returns></returns>
   internal async Task doAWait() {
     await Task.Factory.StartNew(() => {
       for (int i = 0; i < 5; i++){
@@ -258,6 +288,7 @@ public class Controller : IDisposable {
   }
 
   internal void handleOnStream(StreamEventArgs args) {
+    Log.debug("Triggering invokes");
     Stream?.AsyncInvoke(this, args);
   }
   /// <summary>
@@ -267,6 +298,9 @@ public class Controller : IDisposable {
   /// </summary>
   /// <returns></returns>
   public async Task stop() {
+    if (IsStreaming) {
+      await stopStreaming();
+    }
     _status = ControlState.Stopping;
     await KillAll();
     if (porter is not null && porter.IsOpen) {
@@ -275,6 +309,12 @@ public class Controller : IDisposable {
     que.Clear();
     _status = ControlState.Created;
   }
+  /// <summary>
+  /// Attempts to send the start stream command. If the controller
+  /// is not in the Running state, or is already streaming, the
+  /// command will not be sent.
+  /// </summary>
+  /// <returns></returns>
   public async Task startStream() {
     if (status != ControlState.Running) {
       Log.critical("Controller not running.");
@@ -284,9 +324,15 @@ public class Controller : IDisposable {
       Log.critical("Stream command already sent.");
       return;
     }
-    await Task.Factory.StartNew(() => new Commander(this, OpCode.StartStream));
+    await Task.Factory.StartNew(() => new Commander(this, OpCode.StartStream).Run());
     Log.sys("Stream started.");
   }
+  /// <summary>
+  /// Attempts to send the stop streaming command. If the controller
+  /// is not in the Running state, or the stream is already stopped,
+  /// the command will not be sent.
+  /// </summary>
+  /// <returns></returns>
   public async Task stopStreaming() {
     if (status != ControlState.Running) {
       Log.critical("Controller not running.");
@@ -296,7 +342,7 @@ public class Controller : IDisposable {
       Log.critical("Stream already stopped.");
       return;
     }
-    await Task.Factory.StartNew(() => new Commander(this, OpCode.StopStream));
+    await Task.Factory.StartNew(() => new Commander(this, OpCode.StopStream).Run());
     Log.sys("Stream stopped.");
   }
   public void Dispose() {
@@ -306,6 +352,8 @@ public class Controller : IDisposable {
   protected virtual void Dispose(bool disposing) {
     if (!disposed) {
       if (disposing) {
+        _IsStreaming = false;
+        FileLog.close();
         SendKill();
         if (porter is not null && porter.IsOpen) {
           porter.Close();

@@ -16,6 +16,13 @@ C:\..\neural-comp> dotnet run --project "NeurCApp\NeurCApp.csproj"
 
 Press q+ENTER or CTRL+c to exit at any time.
 
+### Arguments
+
+The following command line arguments are recognized:
+
+* l, log  : Set the log level. Options are quiet, critical, sys, warn, and debug.
+* a, auto : Automatically try to connect when the program starts.
+
 ## Notes
 
 The app just links to the dll in the debug folder of the library. Make sure to build the library before you try to run the app.

@@ -26,7 +26,7 @@ public sealed class Log {
   /// Timestamp when the log is created.
   /// </summary>
   private DateTime start;
-  private Levels LogLevel;
+  public Levels LogLevel {set; get;}
   
   private Log() {
     start = DateTime.Now;
@@ -193,7 +193,7 @@ public sealed class Log {
 /// Ensures log files do not exceed 2MB.
 /// Filename format: <date>-<time>-<iteration>.csv
 /// </summary>
-internal sealed class FileLog{
+internal sealed class FileLog : IDisposable{
   /// <summary>
   /// in bytes
   /// </summary>
@@ -204,16 +204,20 @@ internal sealed class FileLog{
   private int log_index = 0;
   private DateTime current_stamp;
   private string log_path = "";
+  private StreamWriter? log_stream;
+  private bool disposed = false;
   private void _incrementLog() {
     log_index++;
-    log_path = $"{current_stamp.ToString("yyyyMMdd")}-{current_stamp.ToString("H:mm:ss")}-{log_index}.csv";
+    log_path = $"{current_stamp.ToString("yyyyMMdd")}-{current_stamp.ToString("HHmmss")}-{log_index}.csv";
+    log_stream?.Dispose();
+    log_stream = new(log_path);
+    _IsOpen = true;
   }
   public void _create() {
     if (IsOpen) return;
     current_stamp = DateTime.Now;
     _incrementLog();
     _write("0,start stream");
-    _IsOpen = true;
   }
   public void _write(string msg) {
     if (!IsOpen) return;
@@ -223,9 +227,7 @@ internal sealed class FileLog{
         _incrementLog();
       }
     }
-    using (StreamWriter w = new StreamWriter(log_path)) {
-      w.WriteLine(Log.instance().timestamp() + "," + msg);
-    }
+    log_stream?.WriteLine(Log.instance().timestamp() + "," + msg);
   }
   public void _write(StreamEventArgs args) {
     // format packet data
@@ -237,6 +239,7 @@ internal sealed class FileLog{
     log_index = 0;
     _write("0,stop stream");
     _IsOpen = false;
+    log_stream?.Dispose();
   }
   private static FileLog? onelog;
   public static FileLog instance() {
@@ -253,5 +256,21 @@ internal sealed class FileLog{
   }
   public static void close() {
     instance()._close();
+  }
+
+  public void Dispose() {
+    Dispose(true);
+    GC.SuppressFinalize(this);
+  }
+  private void Dispose(bool disposing) {
+    if (!disposed) {
+      if (disposing) {
+        _close();
+      }
+      disposed = true;
+    }
+  }
+  ~FileLog() {
+    Dispose(false);
   }
 }

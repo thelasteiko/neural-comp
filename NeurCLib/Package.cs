@@ -143,7 +143,7 @@ public class Package {
     get => MIN_SIZE + payloadSize;
   }
   public bool setByte(int i, byte b) {
-    Log.debug($"Set {i} => {b.ToString("X2")}");
+    //Log.debug($"Set {i} => {b.ToString("X2")}");
     switch(i) {
       case < 3:
         if (headerSync[i] != 0) return false;
