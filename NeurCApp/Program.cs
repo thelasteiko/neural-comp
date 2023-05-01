@@ -1,24 +1,23 @@
 ﻿using NeurCLib;
 
 // initialize log that prints to console
-Log.instance(Log.Levels.SysMsg);
+Log.instance(Log.Levels.Debug);
 Log.sys("Log initialized. Starting...");
 
-// the cop sends messages to the arduino
-Copper cop = new Copper(debug:false);
+Controller c = new(debug:false);
 
 // to handle CTRL+c
-Console.CancelKeyPress += delegate {
-  cop.stop();
+Console.CancelKeyPress += async delegate {
+  await c.stop();
   Log.sys("Exiting...");
   Environment.Exit(0);
 };
 
-Log.debug($"State is: {cop.state.ToString()}");
+Log.debug($"State is: {c.status.ToString()}");
 Log.sys("Starting connection...");
 
 // begin the timer
-cop.start();
+c.start();
 
 Log.sys("Type q+ENTER to quit.");
 
@@ -31,4 +30,4 @@ do {
   }
 } while (!stop.ToLower().StartsWith('q'));
 
-cop.stop();
+c.stop();

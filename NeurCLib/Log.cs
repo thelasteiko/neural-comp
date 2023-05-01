@@ -190,9 +190,68 @@ public sealed class Log {
 }
 /// <summary>
 /// The file log prints stream data and start/stop events to a log file.
-/// 
+/// Ensures log files do not exceed 2MB.
+/// Filename format: <date>-<time>-<iteration>.csv
 /// </summary>
-public sealed class FileLog{
-  private FileLog _onelog;
-  
+internal sealed class FileLog{
+  /// <summary>
+  /// in bytes
+  /// </summary>
+  /// <returns></returns>
+  public const int MAX_FILE_SIZE = (1024*1024*2);
+  private bool _IsOpen = false;
+  public bool IsOpen {get => _IsOpen;}
+  private int log_index = 0;
+  private DateTime current_stamp;
+  private string log_path = "";
+  private void _incrementLog() {
+    log_index++;
+    log_path = $"{current_stamp.ToString("yyyyMMdd")}-{current_stamp.ToString("H:mm:ss")}-{log_index}.csv";
+  }
+  public void _create() {
+    if (IsOpen) return;
+    current_stamp = DateTime.Now;
+    _incrementLog();
+    _write("0,start stream");
+    _IsOpen = true;
+  }
+  public void _write(string msg) {
+    if (!IsOpen) return;
+    // check size of file
+    if (File.Exists(log_path)) {
+      if (new FileInfo(log_path).Length >= MAX_FILE_SIZE) {
+        _incrementLog();
+      }
+    }
+    using (StreamWriter w = new StreamWriter(log_path)) {
+      w.WriteLine(Log.instance().timestamp() + "," + msg);
+    }
+  }
+  public void _write(StreamEventArgs args) {
+    // format packet data
+    string msg = $"{args.timestamp},{args.microvolts}";
+    _write(msg);
+  }
+  public void _close() {
+    if (!IsOpen) return;
+    log_index = 0;
+    _write("0,stop stream");
+    _IsOpen = false;
+  }
+  private static FileLog? onelog;
+  public static FileLog instance() {
+    if (onelog == null) {
+      onelog = new FileLog();
+    }
+    return onelog;
+  }
+  public static void create() {
+    instance()._create();
+  }
+  public static void write(StreamEventArgs args) {
+    instance()._write(args);
+  }
+  public static void close() {
+    instance()._close();
+  }
 }

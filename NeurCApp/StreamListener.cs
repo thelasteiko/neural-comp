@@ -7,10 +7,5 @@ using NeurCLib;
 namespace NeurCApp;
 
 public class StreamListener {
-  public StreamListener() {
-    Controller.OnStreamData onStream = new(Stream_OnStreamData);
-  }
-  public static void Stream_OnStreamData(byte[] data) {
-
-  }
+  
 }

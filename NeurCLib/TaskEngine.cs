@@ -2,8 +2,15 @@ using System;
 using System.Collections.Concurrent;
 
 namespace NeurCLib;
-
-public class TaskEngine {
+/// <summary>
+/// A TaskEngine wraps a function in a loop. When the state
+/// changes, the loop breaks out.
+/// The TaskEngine does not do threading on it's own.
+/// </summary>
+internal class TaskEngine {
+  /// <summary>
+  /// Describes the state, or requested state, of the task object.
+  /// </summary>
   public enum TaskState {
     Created,
     Running,
@@ -11,65 +18,61 @@ public class TaskEngine {
     KillOrder,
     Error
   }
-  internal static ConcurrentDictionary<String, TaskEngine> task_bag = new();
-  internal static bool TryFindTask(String name, out TaskEngine? tsk) {
-    if (task_bag.ContainsKey(name)) {
-      tsk = task_bag[name];
-      return true;
-    }
-    tsk = null;
-    return false;
-  }
-  internal static void KillAll() {
-    foreach (var tsk in task_bag) {
-      tsk.Value.Kill();
-    }
-  }
-  internal static bool IsAlive() {
-    return task_bag.Count > 0;
-  }
+  
   public const String TE_KEEPALIVE = "keepalive";
   public const String TE_LISTENER = "listener";
   public const String TE_CONSUMER = "consumer";
   public const String TE_COMMANDER = "commander";
   protected Mutex state_lock = new();
-  protected TaskState _state;
+  protected TaskState __state;
+  protected TaskState _state {
+    get => __state;
+    set {
+      lock(state_lock) {__state = value;}
+    }
+  }
   public TaskState state {
     get => _state;
   }
   protected String _name;
   public String name {get => _name;}
   protected Controller controller;
+  protected bool FinishWorkOnKill = false;
   public TaskEngine(Controller ctrl, string n) {
     controller = ctrl;
     _state = TaskState.Created;
     _name = n;
+    Log.debug($"Task '{_name}' created.");
   }
-
+  /// <summary>
+  /// Set the status to KillOrder, prompting the task to finish ASAP.
+  /// </summary>
   public void Kill() {
     // change status out of sync
-    lock (state_lock) {
-      _state = TaskState.KillOrder;
-    }
+    _state = TaskState.KillOrder;
   }
-  
-  public void Run() {
-    lock (state_lock) {
-      _state = TaskState.Running;
-    }
-    task_bag.TryAdd(name, this);
-    while (state == TaskState.Running) {
+  /// <summary>
+  /// Runs until told to stop. Should be called within it's own thread.
+  /// </summary>
+  /// <returns></returns>
+  public TaskState Run() {
+    _state = TaskState.Running;
+    Log.debug($"Task '{_name}' running.");
+    controller.task_bag.TryAdd(name, this);
+    while (state == TaskState.Running || FinishWorkOnKill) {
+      //Log.debug($"Task '{_name}' on thread {Thread.CurrentThread.ManagedThreadId}");
       runner();
     }
     // if we break out, remove from bag
-    task_bag.TryRemove(name, out _);
+    controller.task_bag.TryRemove(name, out _);
+    return state;
   }
   protected virtual void runner() {
     throw new NotImplementedException();
   }
 }
 
-public class Keepalive : TaskEngine {
+internal class Keepalive : TaskEngine {
   private int last_keepalive = 0;
   private Mutex return_lock = new();
   private bool last_returned = true;
@@ -82,13 +85,14 @@ public class Keepalive : TaskEngine {
       return;
     }
     Package p = new(PackType.Transaction, OpCode.Keepalive);
+    Log.debug("Sending keepalive.");
     controller.Write(p.toStream(), p.length);
     
     lock(return_lock) {
       last_keepalive = p.packetID;
       last_returned = false;
     }
-    Thread.Sleep(5000);
+    Thread.Sleep(Controller.MAX_TIMEOUT);
   }
   public void sync(Package p) {
     lock(return_lock) {
@@ -103,7 +107,7 @@ public class Keepalive : TaskEngine {
   }
 }
 
-public class Listener : TaskEngine {
+internal class Listener : TaskEngine {
   
   private int timeout_count = 0;
   private int timeout_timeout;
@@ -113,40 +117,37 @@ public class Listener : TaskEngine {
   protected override void runner() {
     // while state alive
       PackFactory pf = new();
+      Log.debug("Starting new read.");
       try {
+        // probably the package is ready but not breaking out
         while (!pf.IsReady) {
           pf.build((byte) controller.porter.ReadByte());
           if (pf.IsFailed) throw new TimeoutException("Packet factory reset timeout.");
         }
-      } catch (TimeoutException) {
-        Log.warn("Port connection timeout");
+      } catch (TimeoutException e) {
+        Log.warn("Port connection timeout: " + e.Message);
         timeout_count++;
-        _state = TaskState.Timeout;
+        //_state = TaskState.Timeout;
         if (timeout_count >= timeout_timeout) {
           Log.critical("Reached connection timeout limit.");
-          _state = TaskState.Error;
+          _state = TaskState.Timeout;
         }
         return;
       } catch (Exception e2) {
-        Log.critical("{0}: {1}", e2.GetType().Name, e2.Message);
+        Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
         _state = TaskState.Error;
         return;
       }
       timeout_count = 0;
       // got a valid packet
+      Log.debug("Packet valid, queueing");
       controller.que.Enqueue(pf.pack);
   }
 }
-public class StreamEventArgs : EventArgs {
-  public StreamPacket data;
-  public StreamEventArgs(StreamPacket sp) {
-    data = sp;
-  }
-}
-public class Consumer : TaskEngine {
-  
+
+internal class Consumer : TaskEngine {
   public Consumer(Controller ctrl) : base(ctrl, TE_CONSUMER) {
-    
+    FinishWorkOnKill = true;
   }
   protected override void runner() {
     Package? p;
@@ -157,6 +158,9 @@ public class Consumer : TaskEngine {
       else if (pt is PackType.Transaction) handleTransaction(p);
       else if (pt is PackType.Stream) handleStream(p);
       else Log.critical("Unknown packet: " + p.ToString());
+    } else if (state == TaskState.KillOrder){
+      // once the queue is depleted, die for real
+      FinishWorkOnKill = false;
     }
   }
   
@@ -191,8 +195,11 @@ public class Consumer : TaskEngine {
     OpCode opc = (OpCode) p.payload[0];
     if (opc == OpCode.Keepalive) {
       TaskEngine? tsk;
-      if (TryFindTask(TE_KEEPALIVE, out tsk)){
-        ((Keepalive) tsk).sync(p);
+      if (controller.TryFindTask(TE_KEEPALIVE, out tsk)){
+        // tsk has to be non-null here
+        #pragma warning disable CS8600, CS8602
+        ((Keepalive)tsk).sync(p);
+        #pragma warning restore CS8600, CS8602
       }
     } else if (opc == OpCode.StartStream || opc == OpCode.StopStream) {
       Commander.sync(p);
@@ -205,25 +212,30 @@ public class Consumer : TaskEngine {
       Log.debug("Packet: " + p.ToString(), p.toStream());
     }
     // payload is the data
-    StreamPacket sp = new(p.payload);
-    
+    StreamEventArgs args = new(p.payload);
+    controller.handleOnStream(args);
     // also save result to log file
-
+    FileLog.write(args);
   }
 }
 
-public class Commander : TaskEngine {
+internal class Commander : TaskEngine {
   private OpCode operation;
+  private int wait_timeout;
+  private int wait_interval;
   /// <summary>
   /// Only one command can be sent at a time.
   /// </summary>
   private static int last_command;
   private static Mutex return_lock = new();
   private static bool last_returned = true;
+  private static Package? return_package = null;
   public Commander(Controller ctrl, OpCode opc) : base(ctrl, TE_COMMANDER) {
     operation = opc;
+    wait_interval = 500;
+    wait_timeout = 3;
   }
-  protected override void runner() {
+  protected override async void runner() {
     // set to kill right away
     _state = TaskState.KillOrder;
     if (!last_returned) {
@@ -240,6 +252,27 @@ public class Commander : TaskEngine {
       last_command = (int)p.packetID;
       last_returned = false;
     }
+    await Task.Factory.StartNew(() => {
+      int c = 0;
+      while (!last_returned && c < wait_timeout) {
+        Thread.Sleep(wait_interval);
+        c++;
+      }
+      if (!last_returned || return_package is null) {
+        Log.sys("Request not honored.");
+        return;
+      }
+      lock (return_lock) {
+        OpCode oc = (OpCode)p.payload[0];
+        if (oc == OpCode.StartStream) {
+          controller._IsStreaming = true;
+          FileLog.create();
+        } else if (oc == OpCode.StopStream) {
+          controller._IsStreaming = false;
+          FileLog.close();
+        }
+      }
+    });
   }
   public static void sync(Package p) {
     lock (return_lock) {
@@ -247,7 +280,7 @@ public class Commander : TaskEngine {
         Log.warn($"Command mismatch: {p.packetID} <> {last_command}");
       }
       last_returned = true;
+      return_package = p;
     }
   }
 }
-

@@ -1,7 +1,7 @@
 
 using System;
 using System.Text;
-using System.Buffers.Binary;
+
 namespace NeurCLib;
   
 public enum PackType {
@@ -28,13 +28,7 @@ public enum OpCode : byte {
   StopStream = 0x04,
   Unknown
 }
-public static class Ext
-{
-    public static bool In<T>(this T val, params T[] values) where T : struct
-    {
-        return values.Contains(val);
-    }
-}
+
 /// <summary>
 /// Definition for the packet data and associated functions.
 /// Provides utility functions to manage and print info.
@@ -67,7 +61,8 @@ public class Package {
     payload = new byte[0];
   }
   public Package(PackType packType, OpCode opc=OpCode.Unknown) {
-    //this.headerSync = new byte[] {0xAA, 0x01, 0x02};
+    this.headerSync = new byte[] {0xAA, 0x01, 0x02};
+    //this.headerSync = new byte[3];
     this.packetType = (byte)packType;
     this.packetID = (byte)packageIndex++;
     int size = 0;
@@ -147,19 +142,35 @@ public class Package {
   public int length {
     get => MIN_SIZE + payloadSize;
   }
-  public void setByte(int i, byte b) {
-    byte[] ray = toStream();
-    if (i > ray.Length) {
-      byte[] ray2 = new byte[ray.Length+1];
-      for (int j = 0; j < ray.Length; j++) {
-        ray2[j] = ray[j];
-      }
-      ray2[i] = b;
-      fromStream(ray2);
-    } else {
-      ray[i] = b;
-      fromStream(ray);
+  public bool setByte(int i, byte b) {
+    Log.debug($"Set {i} => {b.ToString("X2")}");
+    switch(i) {
+      case < 3:
+        if (headerSync[i] != 0) return false;
+        if (b != Header[i]) return false;
+        headerSync[i] = b;
+        break;
+      case 3:
+        packetType = b;
+        break;
+      case 4:
+        packetID = b;
+        break;
+      case 5:
+        payloadSize = b;
+        payload = new byte[b];
+        // Log.debug("Payload size = " + payload.Length);
+        break;
+      case > 5:
+        if (i <= (5+payloadSize)) {
+          // Log.debug($"Set {i-5} to {b.ToString("X2")}");
+          payload[i-6] = b;
+        } else {
+          checksum = b;
+        }
+        break;
     }
+    return true;
   }
   /// <summary>
   /// Checks if the values in the byte array are the same as the object.
@@ -265,39 +276,20 @@ public class PackFactory {
   }
   
   public Package build(byte b) {
+    // Log.debug("Read byte: " + b.ToString("X2"));
     if (reset) {
       _pack = new();
       current_byte = 0;
+      reset = false;
     }
-    // TODO lol
-    for (int i = current_byte; i < 3; i++) {
-      // check each header byte to sync
-      if (_pack.headerSync[i] == 0) {
-        if (b == Package.Header[i]) {
-          // found the correct header value
-          _pack.headerSync[i] = b;
-          current_byte++;
-        } else {
-          // if we hit 0 but the byte doesn't match, reset
-          reset = true;
-          reset_count++;
-        }
-        return _pack;
-      }
-    }
+    // Log.debug($"Set {current_byte} => {b.ToString("X2")}");
     // all headers are set, we are synced
-    _pack.setByte(current_byte++, b);
+    if (!_pack.setByte(current_byte, b)) {
+      // Log.debug("Could not set");
+      reset = true;
+    }
+    current_byte += 1;
+    // Log.debug("Current byte is " + current_byte.ToString());
     return _pack;
-  }
-}
-
-public class StreamPacket {
-  public ulong timestamp {get;}
-  public ushort microvolts {get;}
-  public StreamPacket(byte[] data) {
-    // first 4 are timestamp
-    timestamp = BinaryPrimitives.ReadUInt64LittleEndian(data);
-    // last 2 is neural data
-    microvolts = BinaryPrimitives.ReadUInt16LittleEndian(data.Skip(4).ToArray());
   }
 }
