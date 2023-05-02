@@ -1,6 +1,16 @@
 ﻿using NeurCLib;
 using NeurCApp;
 
+static int ReadChoice() {
+  String? s;
+  int c = 0;
+  s = Console.ReadLine();
+  if (s != null) {
+    int.TryParse(s, out c);
+  }
+  return c;
+}
+
 // TODO command line args
 
 // initialize log that prints to console
@@ -20,40 +30,34 @@ Log.sys("Press CTRL+C to exit anytime.");
 
 // add event listener for stream events
 c.Stream += async (o, e) => {
+  Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
   Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
 };
 
-MenuFactory mf = MenuFactory.BuildSimple("----- MAIN -----", "Connect to Arduino");
-
-mf.WaitPrint();
-
-int choice = mf.ReadChoice();
-
-switch(choice) {
-  case 0:
-    c.stop();
-    Environment.Exit(0);
-    break;
-  case 1:
-    await c.start();
-    break;
-}
-
-mf = MenuFactory.BuildSimple("----- START STREAM -----", "Start Streaming");
-MenuFactory mf2 = MenuFactory.BuildSimple("----- STOP STREAM -----", "Stop Streaming");
-
-do {
-  if (c.IsStreaming) {
-    mf2.WaitPrint();
-    choice = mf2.ReadChoice();
-    if (choice == 1) await c.stopStreaming();
-  } else {
-    mf.WaitPrint();
-    choice = mf.ReadChoice();
-    if (choice == 1) await c.startStream();
+bool running = true;
+// poll
+Task t = new(async () => {
+  while(running) {
+    if(!c.IsRunning()) {
+      await c.stop();
+      Log.debug("1 Status is " + c.status.ToString());
+      await c.doAWait(steps:3, sleepFor:1000);
+      await c.start();
+      if (!c.IsRunning())
+        await c.stop();
+    }
   }
-} while (choice != 0);
+});
+Log.sys("Press 1+ENTER to toggle stream, q+ENTER to quit.");
+Log.sys("Please wait...");
+t.Start();
+while(running) {
+  int choice = ReadChoice();
+  Log.debug("Choice is " + choice.ToString());
+  if (choice == 1) await c.toggleStream();
+  else running = false;
+}
 
 Log.sys("Exiting...");
 
-c.stop();
+await c.stop();

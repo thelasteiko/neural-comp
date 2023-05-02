@@ -74,9 +74,3 @@ public class MenuFactory {
     killbit = true;
   }
 }
-
-public class SimpleListener {
-  public static async void Simple_OnStreamData(object? sender, NeurCLib.StreamEventArgs e) {
-    Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
-  }
-}

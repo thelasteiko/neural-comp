@@ -15,6 +15,7 @@ internal class TaskEngine {
     Created,
     Running,
     Timeout,
+    RequestDenied,
     KillOrder,
     Error
   }
@@ -47,7 +48,7 @@ internal class TaskEngine {
   /// <summary>
   /// Set the status to KillOrder, prompting the task to finish ASAP.
   /// </summary>
-  public void Kill() {
+  public virtual void Kill() {
     // change status out of sync
     _state = TaskState.KillOrder;
   }
@@ -80,6 +81,13 @@ internal class Keepalive : TaskEngine {
     last_keepalive = 0;
     last_returned = true;
   }
+  public override void Kill() {
+    base.Kill();
+    lock(return_lock) {
+      last_keepalive = 0;
+      last_returned = true;
+    }
+  }
   protected override void runner() {
     if (!last_returned) {
       Log.critical("Missed keepalive, resetting");
@@ -87,7 +95,7 @@ internal class Keepalive : TaskEngine {
       return;
     }
     Package p = new(PackType.Transaction, OpCode.Keepalive);
-    // Log.debug("Sending keepalive.");
+    Log.debug("Sending keepalive.");
     controller.Write(p.toStream(), p.length);
     
     lock(return_lock) {
@@ -95,6 +103,7 @@ internal class Keepalive : TaskEngine {
       last_returned = false;
     }
     Thread.Sleep(Controller.MAX_TIMEOUT);
+    //Thread.Sleep(1000);
   }
   public void sync(Package p) {
     lock(return_lock) {
@@ -102,7 +111,7 @@ internal class Keepalive : TaskEngine {
         Log.warn($"Keepalive mismatch: {p.packetID} <> {last_keepalive}");
         _state = TaskState.Error;
       } else {  
-        Log.sys("Still Alive");
+        Log.critical("Still Alive");
         last_returned = true;
       }
     }
@@ -172,7 +181,7 @@ internal class Consumer : TaskEngine {
   /// </summary>
   /// <param name="ray">Output from arduino</param>
   protected void handleError(Package p) {
-    _state = TaskState.Error;
+    //_state = TaskState.Error;
     if (p.payload.Length == 0) {
       Log.critical("Error occured: 0 length response");
       return;
@@ -214,10 +223,10 @@ internal class Consumer : TaskEngine {
       Log.warn("Bad checksum on stream packet.");
       Log.debug("Packet: " + p.ToString(), p.toStream());
     }
-    Log.debug("Stream data:", p.toStream());
+    // Log.debug("Stream data:", p.toStream());
     // payload is the data
     StreamEventArgs args = new(p.payload);
-    Log.debug("After args");
+    // Log.debug("After args");
     controller.handleOnStream(args);
     // also save result to log file
     FileLog.write(args);
@@ -237,12 +246,18 @@ internal class Commander : TaskEngine {
   private static Package? return_package = null;
   public Commander(Controller ctrl, OpCode opc) : base(ctrl, TE_COMMANDER) {
     operation = opc;
-    wait_interval = 500;
+    wait_interval = Controller.MAX_TIMEOUT;
     wait_timeout = 3;
   }
+  public override void Kill() {
+    base.Kill();
+    lock(return_lock) {
+      last_command = 0;
+      last_returned = true;
+      return_package = null;
+    }
+  }
   protected override void runner() {
-    // set to kill right away
-    _state = TaskState.KillOrder;
     if (!last_returned) {
       Log.sys("Last command not yet returned.");
       // reset the return lock...b/c
@@ -251,20 +266,24 @@ internal class Commander : TaskEngine {
     }
     // write command
     Package p = new(PackType.Transaction, operation);
+    Log.debug("Writing command");
     controller.Write(p.toStream(), p.length);
 
     lock (return_lock) {
       last_command = (int)p.packetID;
       last_returned = false;
     }
-    
+    // Log.debug($"Waiting for response: {wait_timeout}|{wait_interval}");
+    // Log.debug("Last response: " + last_returned.ToString());
     int c = 0;
     while (!last_returned && c < wait_timeout) {
+      // Log.debug($"{c} :: Waiting {wait_interval}ms");
       Thread.Sleep(wait_interval);
       c++;
     }
     if (!last_returned || return_package is null) {
       Log.sys("Request not honored.");
+      _state = TaskState.RequestDenied;
       return;
     }
     lock (return_lock) {
@@ -277,6 +296,8 @@ internal class Commander : TaskEngine {
         FileLog.close();
       }
     }
+    // don't repeat
+    _state = TaskState.KillOrder;
   }
   public static void sync(Package p) {
     lock (return_lock) {

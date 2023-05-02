@@ -3,14 +3,19 @@
 NeurCApp/bin/*
 NeurCApp/obj/Debug/net6.0/*.cache
 NeurCApp/obj/Debug/net6.0/*.dll
+NeurCApp/obj/Debug/net6.0/ref/*.dll
+NeurCApp/obj/Debug/net6.0/refint/*.dll
 NeurCApp/obj/*.cache
 
 NeurCLib/bin/*
 NeurCLib/obj/Debug/net6.0/*.cache
 NeurCLib/obj/Debug/net6.0/*.dll
+NeurCLib/obj/Debug/net6.0/ref/*.dll
+NeurCLib/obj/Debug/net6.0/refint/*.dll
 NeurCLib/obj/*.cache
 
 NeurCLib/obj/Debug/net6.0/NeurCLib.GeneratedMSBuildEditorConfig.editorconfig
 NeurCLib/obj/NeurCLib.csproj.nuget.dgspec.json
 
 *.csv
+*.dll

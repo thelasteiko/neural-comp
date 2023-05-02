@@ -92,7 +92,7 @@ internal static class Ext {
     int count = delegates.Length;
     Exception? exception = null;
     
-    Log.debug($"Triggering for {count} delegates");
+    // Log.debug($"Triggering for {count} delegates");
     foreach (var d in delegates) {
       var async = d.Method.GetCustomAttributes(typeof(AsyncStateMachineAttribute), false).Any();
       
