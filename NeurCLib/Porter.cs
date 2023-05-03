@@ -14,6 +14,7 @@ namespace NeurCLib {
     public int ReadTimeout {get;set;}
     public int WriteTimeout {get;set;}
     public Boolean IsOpen {get;}
+    public int BytesToRead {get;}
 
     public void Open();
     public void Close();
@@ -72,6 +73,10 @@ namespace NeurCLib {
     public Boolean IsOpen {
       get => _IsOpen;
       set => _IsOpen = value;
+    }
+    private int _BytesToRead = 0;
+    public int BytesToRead {
+      get => _BytesToRead;
     }
     #endregion
     /// <summary>
@@ -186,6 +191,9 @@ namespace NeurCLib {
     }
     public Boolean IsOpen {
       get => sporter.IsOpen;
+    }
+    public int BytesToRead {
+      get => sporter.BytesToRead;
     }
     #endregion
     

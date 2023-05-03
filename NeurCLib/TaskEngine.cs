@@ -5,7 +5,8 @@ namespace NeurCLib;
 /// <summary>
 /// A TaskEngine wraps a function in a loop. When the state
 /// changes, the loop breaks out.
-/// The TaskEngine does not do threading on it's own.
+/// The TaskEngine does not do threading on it's own, but enables
+/// tasks to track state and some parameters.
 /// </summary>
 internal class TaskEngine {
   /// <summary>
@@ -24,6 +25,7 @@ internal class TaskEngine {
   public const String TE_LISTENER = "listener";
   public const String TE_CONSUMER = "consumer";
   public const String TE_COMMANDER = "commander";
+  public const String TE_STREAMER = "streamer";
   protected Mutex state_lock = new();
   protected TaskState __state;
   protected TaskState _state {
@@ -72,103 +74,113 @@ internal class TaskEngine {
     throw new NotImplementedException();
   }
 }
-
+/// <summary>
+/// Sends the keepalive packet to the port and listens to the keepalive
+/// queue for the response.
+/// </summary>
 internal class Keepalive : TaskEngine {
   private int last_keepalive = 0;
-  private Mutex return_lock = new();
   private bool last_returned = true;
   public Keepalive(Controller ctrl) : base(ctrl, TE_KEEPALIVE) {
     last_keepalive = 0;
     last_returned = true;
   }
-  public override void Kill() {
-    base.Kill();
-    lock(return_lock) {
-      last_keepalive = 0;
-      last_returned = true;
-    }
-  }
   protected override void runner() {
-    if (!last_returned) {
-      Log.critical("Missed keepalive, resetting");
-      _state = TaskState.Error;
-      return;
-    }
-    Package p = new(PackType.Transaction, OpCode.Keepalive);
-    Log.debug("Sending keepalive.");
-    controller.Write(p.toStream(), p.length);
-    
-    lock(return_lock) {
-      last_keepalive = p.packetID;
-      last_returned = false;
-    }
-    Thread.Sleep(Controller.MAX_TIMEOUT);
-    //Thread.Sleep(1000);
-  }
-  public void sync(Package p) {
-    lock(return_lock) {
+    Package? p;
+    if(last_keepalive > 0 && controller.q_keepalive.TryDequeue(out p)) {
       if (p.packetID != last_keepalive) {
         Log.warn($"Keepalive mismatch: {p.packetID} <> {last_keepalive}");
-        _state = TaskState.Error;
       } else {  
         Log.critical("Still Alive");
-        last_returned = true;
       }
+      last_returned = true;
     }
+    if (!last_returned) {
+      Log.critical("Missed keepalive, reconnecting.");
+      // _state = TaskState.Error;
+      // return;
+    }
+    p = new(PackType.Transaction, OpCode.Keepalive);
+    Log.debug("Sending keepalive.");
+    //check before writing
+    if (state == TaskState.KillOrder) {
+      Log.sys("Killing keepalive");
+      return;
+    }
+    controller.Write(p.toStream(), p.length);
+    
+    last_keepalive = p.packetID;
+    last_returned = false;
+    Thread.Sleep(Controller.MAX_TIMEOUT);
+    // Thread.Sleep(1000);
   }
 }
-
+/// <summary>
+/// Listens to the port, builds packets, and queues them for sorting.
+/// </summary>
 internal class Listener : TaskEngine {
   
   private int timeout_count = 0;
   private int timeout_timeout;
   public Listener(Controller ctrl, int timeout=3) : base(ctrl, TE_LISTENER) {
     timeout_timeout = timeout;
+    // Log.debug("Port timeout: " + controller.porter.ReadTimeout.ToString());
   }
   protected override void runner() {
-    // while state alive
-      PackFactory pf = new();
-      // Log.debug("Starting new read.");
-      try {
-        // probably the package is ready but not breaking out
-        while (!pf.IsReady) {
-          pf.build((byte) controller.porter.ReadByte());
-          if (pf.IsFailed) throw new TimeoutException("Packet factory reset timeout.");
-        }
-      } catch (TimeoutException e) {
-        Log.warn("Port connection timeout: " + e.Message);
-        timeout_count++;
-        //_state = TaskState.Timeout;
-        if (timeout_count >= timeout_timeout) {
-          Log.critical("Reached connection timeout limit.");
-          _state = TaskState.Timeout;
-        }
-        return;
-      } catch (Exception e2) {
-        Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
-        _state = TaskState.Error;
-        return;
+    PackFactory pf = new();
+    // Log.debug("Starting new read.");
+    try {
+      // go until we build or fail
+      while (!pf.IsReady && controller.porter.BytesToRead > 0) {
+        // Log.debug("Bytes: " + controller.porter.BytesToRead.ToString());
+        byte b = (byte) controller.porter.ReadByte();
+        if (b >= 0) pf.build(b);
+        else break;
+        if (pf.IsFailed) throw new TimeoutException("Packet factory reset timeout.");
       }
-      timeout_count = 0;
+    } catch (TimeoutException e) {
+      Log.warn("Port connection timeout: " + e.Message);
+      timeout_count++;
+      if (timeout_count >= timeout_timeout) {
+        Log.critical("Reached connection timeout limit.");
+        _state = TaskState.Timeout;
+      }
+      return;
+    } catch (Exception e2) {
+      Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
+      _state = TaskState.Error;
+      return;
+    }
+    timeout_count = 0;
+    if (pf.IsReady) {
       // got a valid packet
       // Log.debug("Packet valid, queueing");
-      controller.que.Enqueue(pf.pack);
+      controller.q_all.Enqueue(pf.pack);
+    }
   }
 }
-
+/// <summary>
+/// Sorts the queued packets and hands them off to the correct queues.
+/// </summary>
 internal class Consumer : TaskEngine {
-  public Consumer(Controller ctrl) : base(ctrl, TE_CONSUMER) {
+  private int reconnect_timeout;
+  private int current_reconnect_attempts = 0;
+  public Consumer(Controller ctrl, int timeout=3) : base(ctrl, TE_CONSUMER) {
     FinishWorkOnKill = true;
+    reconnect_timeout = timeout;
   }
   protected override void runner() {
     Package? p;
-    if (controller.que.TryDequeue(out p)) {
+    if (controller.q_all.TryDequeue(out p)) {
       // see what we got
       PackType pt = (PackType) p.packetType;
       if (pt is PackType.Failure) handleError(p);
       else if (pt is PackType.Transaction) handleTransaction(p);
       else if (pt is PackType.Stream) handleStream(p);
-      else Log.critical("Unknown packet: " + p.ToString());
+      else {
+        Log.critical("Unknown packet received");
+        Log.debug(p.ToString(), p.toStream());
+      }
     } else if (state == TaskState.KillOrder){
       // once the queue is depleted, die for real
       FinishWorkOnKill = false;
@@ -179,7 +191,6 @@ internal class Consumer : TaskEngine {
   /// Handle an error thrown by the arduino. Reads the error
   /// and prints an error message.
   /// </summary>
-  /// <param name="ray">Output from arduino</param>
   protected void handleError(Package p) {
     //_state = TaskState.Error;
     if (p.payload.Length == 0) {
@@ -199,113 +210,125 @@ internal class Consumer : TaskEngine {
       ErrorType.NotConnected => "Not connected",
       _ => throw new ArgumentOutOfRangeException(errorType.ToString(), $"Unexpected error: {errorType.ToString()}")
     };
+    if (errorType.In(ErrorType.BadChecksum, ErrorType.BadOpCode, ErrorType.BadPackType)) {
+      _state = TaskState.Error;
+    } else if (errorType == ErrorType.NotConnected) {
+      if (current_reconnect_attempts >= reconnect_timeout) {
+        _state = TaskState.Error;
+      } else {
+        controller.sendConnectAsync();
+        current_reconnect_attempts++;
+      }
+    }
     Log.critical(report);
     Log.debug("Packet: " + p.ToString(), p.toStream());
   }
+  /// <summary>
+  /// Handle keepalives and control responses. Hands off to respective tasks.
+  /// </summary>
+  /// <param name="p"></param>
   protected void handleTransaction(Package p) {
+    current_reconnect_attempts = 0;
     OpCode opc = (OpCode) p.payload[0];
     if (opc == OpCode.Keepalive) {
-      TaskEngine? tsk;
-      if (controller.TryFindTask(TE_KEEPALIVE, out tsk)){
-        // tsk has to be non-null here
-        #pragma warning disable CS8600, CS8602
-        ((Keepalive)tsk).sync(p);
-        #pragma warning restore CS8600, CS8602
-      }
-    } else if (opc == OpCode.StartStream || opc == OpCode.StopStream) {
+      controller.q_keepalive.Enqueue(p);
+    } else if (opc.In(OpCode.StartStream, OpCode.StopStream, OpCode.Initial)) {
       // Log.debug("Command:", p.toStream());
-      Commander.sync(p);
+      controller.q_controls.Enqueue(p);
     }
   }
+  /// <summary>
+  /// Hands off stream data to the streamer task.
+  /// </summary>
+  /// <param name="p"></param>
   protected void handleStream(Package p) {
+    current_reconnect_attempts = 0;
     // check check
     if (!p.isValid()) {
       Log.warn("Bad checksum on stream packet.");
       Log.debug("Packet: " + p.ToString(), p.toStream());
     }
-    // Log.debug("Stream data:", p.toStream());
-    // payload is the data
-    StreamEventArgs args = new(p.payload);
-    // Log.debug("After args");
-    controller.handleOnStream(args);
-    // also save result to log file
-    FileLog.write(args);
+    controller.q_stream.Enqueue(p);
   }
 }
-
+/// <summary>
+/// Sends commands on behalf of the user and listens for responses from
+/// the arduino. Attempts to keep from sending the same command twice.
+/// </summary>
 internal class Commander : TaskEngine {
-  private OpCode operation;
-  private int wait_timeout;
-  private int wait_interval;
   /// <summary>
   /// Only one command can be sent at a time.
   /// </summary>
-  private static int last_command = 0;
-  private static Mutex return_lock = new();
-  private static bool last_returned = true;
-  private static Package? return_package = null;
-  public Commander(Controller ctrl, OpCode opc) : base(ctrl, TE_COMMANDER) {
-    operation = opc;
-    wait_interval = Controller.MAX_TIMEOUT;
-    wait_timeout = 3;
-  }
-  public override void Kill() {
-    base.Kill();
-    lock(return_lock) {
-      last_command = 0;
-      last_returned = true;
-      return_package = null;
-    }
+  private int last_command_id = 0;
+  private bool last_returned = true;
+  private OpCode last_command = OpCode.Unknown;
+  public Commander(Controller ctrl) : base(ctrl, TE_COMMANDER) {
   }
   protected override void runner() {
-    if (!last_returned) {
-      Log.sys("Last command not yet returned.");
-      // reset the return lock...b/c
+    OpCode op;
+    Package? p;
+    if (controller.q_user.TryDequeue(out op)) {
+      // first check if we are triggering twice
+      if (op != OpCode.Initial && last_command == op) {
+        Log.sys("Command sent, please wait.");
+        // reset to force next
+        last_command = OpCode.Unknown;
+      } else if (!last_returned) {
+        // we are waiting for response
+        Log.sys("Last command response not yet received, please wait.");
+      } else {
+        p = new(PackType.Transaction, op);
+        Log.debug("Writing command");
+        //check before writing
+        if (state == TaskState.KillOrder) {
+          Log.sys("Killing commander");
+          return;
+        }
+        controller.Write(p.toStream(), p.length);
+        last_command_id = p.packetID;
+        last_command = op;
+      }
+    }
+    // we are waiting for a command
+    if (last_command > 0 && controller.q_controls.TryDequeue(out p)) {
+      if (p.packetID != last_command_id) {
+        Log.warn($"Command mismatch: {p.packetID} <> {last_command}");
+      }
       last_returned = true;
-      return;
-    }
-    // write command
-    Package p = new(PackType.Transaction, operation);
-    Log.debug("Writing command");
-    controller.Write(p.toStream(), p.length);
-
-    lock (return_lock) {
-      last_command = (int)p.packetID;
-      last_returned = false;
-    }
-    // Log.debug($"Waiting for response: {wait_timeout}|{wait_interval}");
-    // Log.debug("Last response: " + last_returned.ToString());
-    int c = 0;
-    while (!last_returned && c < wait_timeout) {
-      // Log.debug($"{c} :: Waiting {wait_interval}ms");
-      Thread.Sleep(wait_interval);
-      c++;
-    }
-    if (!last_returned || return_package is null) {
-      Log.sys("Request not honored.");
-      _state = TaskState.RequestDenied;
-      return;
-    }
-    lock (return_lock) {
-      OpCode oc = (OpCode)return_package.payload[0];
+      OpCode oc = (OpCode)p.payload[0];
       if (oc == OpCode.StartStream) {
         controller._IsStreaming = true;
         FileLog.create();
       } else if (oc == OpCode.StopStream) {
         controller._IsStreaming = false;
         FileLog.close();
+      } else if (oc == OpCode.Initial) {
+        Log.sys("Connection initialized.");
+        if (controller.IsStreaming) controller.startStreaming();
       }
+      // reset for next command
+      last_command_id = 0;
+      last_command = OpCode.Unknown;
     }
-    // don't repeat
-    _state = TaskState.KillOrder;
   }
-  public static void sync(Package p) {
-    lock (return_lock) {
-      if (p.packetID != last_command) {
-        Log.warn($"Command mismatch: {p.packetID} <> {last_command}");
-      }
-      last_returned = true;
-      return_package = p;
+}
+/// <summary>
+/// 
+/// </summary>
+internal class Streamer : TaskEngine {
+  public Streamer(Controller ctrl) : base(ctrl, TE_STREAMER) {
+    FinishWorkOnKill = true;
+  }
+  protected override void runner() {
+    Package? p;
+    if (controller.q_stream.TryDequeue(out p)) {
+      // got stream data, save and send
+      StreamEventArgs args = new(p.payload);
+      FileLog.write(args);
+      controller.handleOnStream(args);
+    } else if (state == TaskState.KillOrder) {
+      // go until we run out
+      FinishWorkOnKill = false;
     }
   }
 }

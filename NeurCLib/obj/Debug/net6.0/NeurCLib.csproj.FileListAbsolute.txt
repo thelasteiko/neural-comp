@@ -10,3 +10,15 @@ c:\temp\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.dll
 c:\temp\neural-comp\NeurCLib\obj\Debug\net6.0\refint\NeurCLib.dll
 c:\temp\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.pdb
 c:\temp\neural-comp\NeurCLib\obj\Debug\net6.0\ref\NeurCLib.dll
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\bin\Debug\net6.0\NeurCLib.deps.json
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\bin\Debug\net6.0\NeurCLib.dll
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\bin\Debug\net6.0\NeurCLib.pdb
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.csproj.AssemblyReference.cache
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.AssemblyInfoInputs.cache
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.AssemblyInfo.cs
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.csproj.CoreCompileInputs.cache
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.dll
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\refint\NeurCLib.dll
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\NeurCLib.pdb
+c:\Users\memre\Documents\git-repos\neural-comp\NeurCLib\obj\Debug\net6.0\ref\NeurCLib.dll

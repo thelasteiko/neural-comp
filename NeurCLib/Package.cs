@@ -165,9 +165,9 @@ public class Package {
         if (i <= (5+payloadSize)) {
           // Log.debug($"Set {i-5} to {b.ToString("X2")}");
           payload[i-6] = b;
-        } else {
+        } else if (i == (5+payloadSize+1)) {
           checksum = b;
-        }
+        } else {return false;}
         break;
     }
     return true;
@@ -281,11 +281,12 @@ public class PackFactory {
       _pack = new();
       current_byte = 0;
       reset = false;
+      // Log.debug("Reset packet factory.");
     }
     // Log.debug($"Set {current_byte} => {b.ToString("X2")}");
     // all headers are set, we are synced
     if (!_pack.setByte(current_byte, b)) {
-      // Log.debug("Could not set");
+      // Log.debug($"Could not set {current_byte}={b.ToString("X2")}: ", pack.toStream());
       reset = true;
     }
     current_byte += 1;

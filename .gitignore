@@ -3,6 +3,7 @@
 NeurCApp/bin/*
 NeurCApp/obj/Debug/net6.0/*.cache
 NeurCApp/obj/Debug/net6.0/*.dll
+NeurCApp/obj/Debug/net6.0/*.exe
 NeurCApp/obj/Debug/net6.0/ref/*.dll
 NeurCApp/obj/Debug/net6.0/refint/*.dll
 NeurCApp/obj/*.cache
@@ -19,3 +20,4 @@ NeurCLib/obj/NeurCLib.csproj.nuget.dgspec.json
 
 *.csv
 *.dll
+*.exe

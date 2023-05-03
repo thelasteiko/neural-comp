@@ -206,28 +206,31 @@ internal sealed class FileLog : IDisposable{
   private string log_path = "";
   private StreamWriter? log_stream;
   private bool disposed = false;
+  private int bytes_written = 0;
   private void _incrementLog() {
     log_index++;
     log_path = $"{current_stamp.ToString("yyyyMMdd")}-{current_stamp.ToString("HHmmss")}-{log_index}.csv";
     log_stream?.Dispose();
     log_stream = new(log_path);
     _IsOpen = true;
+    bytes_written = 0;
   }
   public void _create() {
     if (IsOpen) return;
     current_stamp = DateTime.Now;
     _incrementLog();
     _write("0,start stream");
+    Log.debug("Starting log");
   }
   public void _write(string msg) {
     if (!IsOpen) return;
     // check size of file
-    if (File.Exists(log_path)) {
-      if (new FileInfo(log_path).Length >= MAX_FILE_SIZE) {
-        _incrementLog();
-      }
+    if (bytes_written >= MAX_FILE_SIZE) {
+      _incrementLog();
     }
-    log_stream?.WriteLine(Log.instance().timestamp() + "," + msg);
+    string s = Log.instance().timestamp() + "," + msg;
+    bytes_written += s.Length;
+    log_stream?.WriteLine(s);
   }
   public void _write(StreamEventArgs args) {
     // format packet data
@@ -240,6 +243,7 @@ internal sealed class FileLog : IDisposable{
     _write("0,stop stream");
     _IsOpen = false;
     log_stream?.Dispose();
+    Log.debug("Closing log");
   }
   private static FileLog? onelog;
   public static FileLog instance() {

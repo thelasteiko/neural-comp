@@ -231,11 +231,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "c:\\temp\\neural-comp\\NeurCLib\\NeurCLib.csproj",
+      "projectUniqueName": "c:\\Users\\memre\\Documents\\git-repos\\neural-comp\\NeurCLib\\NeurCLib.csproj",
       "projectName": "NeurCLib",
-      "projectPath": "c:\\temp\\neural-comp\\NeurCLib\\NeurCLib.csproj",
+      "projectPath": "c:\\Users\\memre\\Documents\\git-repos\\neural-comp\\NeurCLib\\NeurCLib.csproj",
       "packagesPath": "C:\\Users\\memre\\.nuget\\packages\\",
-      "outputPath": "c:\\temp\\neural-comp\\NeurCLib\\obj\\",
+      "outputPath": "c:\\Users\\memre\\Documents\\git-repos\\neural-comp\\NeurCLib\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\memre\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -283,7 +283,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\6.0.407\\RuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\6.0.408\\RuntimeIdentifierGraph.json"
       }
     }
   }

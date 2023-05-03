@@ -20,44 +20,57 @@ Log.sys("Log initialized. Starting...");
 Controller c = new(debug:false);
 
 // to handle CTRL+c
-Console.CancelKeyPress += delegate {
-  c.stop();
+Console.CancelKeyPress += async delegate {
   Log.sys("Exiting...");
+  await c.stop();
+  c.Dispose();
   Environment.Exit(0);
 };
 
 Log.sys("Press CTRL+C to exit anytime.");
 
 // add event listener for stream events
-c.Stream += async (o, e) => {
-  Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
+c.Stream += (o, e) => {
+  //Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
   Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
 };
 
 bool running = true;
 // poll
 Task t = new(async () => {
+  await c.start();
   while(running) {
     if(!c.IsRunning()) {
-      await c.stop();
+      if (c.status == Controller.ControlState.Error)
+        await c.stop();
       Log.debug("1 Status is " + c.status.ToString());
-      await c.doAWait(steps:3, sleepFor:1000);
+      await c.doAWait(steps:10, sleepFor:500);
       await c.start();
       if (!c.IsRunning())
         await c.stop();
     }
   }
 });
-Log.sys("Press 1+ENTER to toggle stream, q+ENTER to quit.");
+Log.sys("Options: ");
+Log.sys("\t1. Start Stream");
+Log.sys("\t2. Stop Stream");
+Log.sys("\tq. Quit");
 Log.sys("Please wait...");
+await c.doAWait(5, 500);
 t.Start();
 while(running) {
   int choice = ReadChoice();
   Log.debug("Choice is " + choice.ToString());
-  if (choice == 1) await c.toggleStream();
-  else running = false;
+  // if (choice == 1) c.toggleStream();
+  // else running = false;
+  if (c.IsRunning()) {
+    if (choice == 1) c.startStreaming();
+    else if (choice == 2) c.stopStreaming();
+    else running = false;
+  }
 }
 
 Log.sys("Exiting...");
 
 await c.stop();
+c.Dispose();
