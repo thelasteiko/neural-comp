@@ -14,15 +14,25 @@ C:\..\neural-comp> dotnet build "NeurCLib\NeurCLib.csproj"
 C:\..\neural-comp> dotnet run --project "NeurCApp\NeurCApp.csproj"
 ```
 
-Press q+ENTER or CTRL+c to exit at any time.
+The program will start with the following options:
 
-### Arguments
+1. Start Stream
+2. Stop Stream
+3. Quit
 
-The following command line arguments are recognized:
+Press 1|2|3 + ENTER to make a choice.
 
-* l, log  : Set the log level. Options are quiet, critical, sys, warn, and debug.
-* a, auto : Automatically try to connect when the program starts.
+Press 3+ENTER or CTRL+c to exit at any time.
+
+The program pauses for ~3 seconds after showing the menu options.
+
+## Expected Output
+The program will start by attempting to connect to the arduino.
 
 ## Notes
 
 The app just links to the dll in the debug folder of the library. Make sure to build the library before you try to run the app.
+
+One artifact of testing with the arduino was that sometimes, after the arduino reset while the data stream was running, restarting the stream took a few more seconds to come back after the connect was acknowledged and the keepalive started.
+
+I put handling the user events and saving data to the log in the same thread....for project 2 this seemed to be enough but I will consider separating that for the next iteration.

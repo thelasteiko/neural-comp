@@ -11,13 +11,11 @@ static int ReadChoice() {
   return c;
 }
 
-// TODO command line args
-
 // initialize log that prints to console
-Log.instance(Log.Levels.Debug);
+Log.instance(Log.Levels.SysMsg);
 Log.sys("Log initialized. Starting...");
 
-Controller c = new(debug:false);
+Controller c = new();
 
 // to handle CTRL+c
 Console.CancelKeyPress += async delegate {
@@ -36,10 +34,11 @@ c.Stream += (o, e) => {
 };
 
 bool running = true;
-// poll
+// task for running the controller so it's not blocked by read
 Task t = new(async () => {
   await c.start();
   while(running) {
+    // try to restart if failed
     if(!c.IsRunning()) {
       if (c.status == Controller.ControlState.Error)
         await c.stop();
@@ -51,12 +50,12 @@ Task t = new(async () => {
     }
   }
 });
-Log.sys("Options: ");
-Log.sys("\t1. Start Stream");
-Log.sys("\t2. Stop Stream");
-Log.sys("\tq. Quit");
+// show menu, wait a bit so user can read it
+string menu = "Options:\n\t1. Start Stream\n\t2. Stop Stream\n\t3. Quit";
+Log.sys(menu);
 Log.sys("Please wait...");
-await c.doAWait(5, 500);
+await c.doAWait(6, 500);
+// start task and wait for user input
 t.Start();
 while(running) {
   int choice = ReadChoice();
@@ -66,7 +65,10 @@ while(running) {
   if (c.IsRunning()) {
     if (choice == 1) c.startStreaming();
     else if (choice == 2) c.stopStreaming();
-    else running = false;
+    else if (choice == 3) running = false;
+    else {
+      Log.sys(menu);
+    }
   }
 }
 

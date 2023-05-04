@@ -265,7 +265,7 @@ public class PackFactory {
   private int reset_count = 0;
   private int reset_timeout = 50;
   public bool IsReady {
-    get => (_pack != null && _pack.isValid());
+    get => (_pack != null && _pack.checksum != 0);
   }
   public bool IsFailed {
     get => (reset_count >= reset_timeout && !IsReady);

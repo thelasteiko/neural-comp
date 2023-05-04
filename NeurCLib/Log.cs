@@ -192,14 +192,19 @@ public sealed class Log {
 /// The file log prints stream data and start/stop events to a log file.
 /// Ensures log files do not exceed 2MB.
 /// Filename format: <date>-<time>-<iteration>.csv
+/// Record format: <log timestamp>,<packet timestamp>,<microvolts>
 /// </summary>
 internal sealed class FileLog : IDisposable{
   /// <summary>
-  /// in bytes
+  /// Max allowable log file size in bytes.
   /// </summary>
   /// <returns></returns>
   public const int MAX_FILE_SIZE = (1024*1024*2);
   private bool _IsOpen = false;
+  /// <summary>
+  /// Whether the file stream is open or not.
+  /// </summary>
+  /// <value></value>
   public bool IsOpen {get => _IsOpen;}
   private int log_index = 0;
   private DateTime current_stamp;
@@ -215,6 +220,9 @@ internal sealed class FileLog : IDisposable{
     _IsOpen = true;
     bytes_written = 0;
   }
+  /// <summary>
+  /// Create and start the log file. Opens the stream writer.
+  /// </summary>
   public void _create() {
     if (IsOpen) return;
     current_stamp = DateTime.Now;
@@ -222,6 +230,11 @@ internal sealed class FileLog : IDisposable{
     _write("0,start stream");
     Log.debug("Starting log");
   }
+  /// <summary>
+  /// Write text to the log file. Format is CSV, with the log timestamp
+  /// in the first column.
+  /// </summary>
+  /// <param name="msg"></param>
   public void _write(string msg) {
     if (!IsOpen) return;
     // check size of file
@@ -232,11 +245,18 @@ internal sealed class FileLog : IDisposable{
     bytes_written += s.Length;
     log_stream?.WriteLine(s);
   }
+  /// <summary>
+  /// Write the stream data to the log file.
+  /// </summary>
+  /// <param name="args"></param>
   public void _write(StreamEventArgs args) {
     // format packet data
     string msg = $"{args.timestamp},{args.microvolts}";
     _write(msg);
   }
+  /// <summary>
+  /// Close the log and dispose the stream writer.
+  /// </summary>
   public void _close() {
     if (!IsOpen) return;
     log_index = 0;
@@ -246,22 +266,38 @@ internal sealed class FileLog : IDisposable{
     Log.debug("Closing log");
   }
   private static FileLog? onelog;
+  /// <summary>
+  /// Get the file log instance.
+  /// </summary>
+  /// <returns></returns>
   public static FileLog instance() {
     if (onelog == null) {
       onelog = new FileLog();
     }
     return onelog;
   }
+  /// <summary>
+  /// Create and start the log file. Opens the stream writer.
+  /// </summary>
   public static void create() {
     instance()._create();
   }
+  /// <summary>
+  /// Write the stream data to the log file.
+  /// </summary>
+  /// <param name="args"></param>
   public static void write(StreamEventArgs args) {
     instance()._write(args);
   }
+  /// <summary>
+  /// Close the log and dispose the stream writer.
+  /// </summary>
   public static void close() {
     instance()._close();
   }
-
+  /// <summary>
+  /// Close the log
+  /// </summary>
   public void Dispose() {
     Dispose(true);
     GC.SuppressFinalize(this);

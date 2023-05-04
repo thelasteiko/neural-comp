@@ -16,15 +16,28 @@ internal class TaskEngine {
     Created,
     Running,
     Timeout,
-    RequestDenied,
     KillOrder,
     Error
   }
-  
+  /// <summary>
+  /// Name of the keepalive task
+  /// </summary>
   public const String TE_KEEPALIVE = "keepalive";
+  /// <summary>
+  /// Name of the listener task
+  /// </summary>
   public const String TE_LISTENER = "listener";
+  /// <summary>
+  /// Name of the consumer task
+  /// </summary>
   public const String TE_CONSUMER = "consumer";
+  /// <summary>
+  /// Name of the commander task
+  /// </summary>
   public const String TE_COMMANDER = "commander";
+  /// <summary>
+  /// Name of the streamer task
+  /// </summary>
   public const String TE_STREAMER = "streamer";
   protected Mutex state_lock = new();
   protected TaskState __state;
@@ -34,13 +47,32 @@ internal class TaskEngine {
       lock(state_lock) {__state = value;}
     }
   }
+  /// <summary>
+  /// Current state of the task.
+  /// </summary>
+  /// <value></value>
   public TaskState state {
     get => _state;
   }
   protected String _name;
+  /// <summary>
+  /// The name of the task which is used a key for the controller's task bag
+  /// </summary>
+  /// <value></value>
   public String name {get => _name;}
+  /// <summary>
+  /// In this context, controls the task bag and allows access to the port.
+  /// </summary>
   protected Controller controller;
+  /// <summary>
+  /// Some tasks can continue in order to clear queues before dying.
+  /// </summary>
   protected bool FinishWorkOnKill = false;
+  /// <summary>
+  /// Create a task with a name
+  /// </summary>
+  /// <param name="ctrl">Controller object</param>
+  /// <param name="n">Name of the task</param>
   public TaskEngine(Controller ctrl, string n) {
     controller = ctrl;
     _state = TaskState.Created;
@@ -57,7 +89,7 @@ internal class TaskEngine {
   /// <summary>
   /// Runs until told to stop. Should be called within it's own thread.
   /// </summary>
-  /// <returns></returns>
+  /// <returns>The final state of the task</returns>
   public TaskState Run() {
     _state = TaskState.Running;
     Log.debug($"Task '{_name}' running.");
@@ -91,14 +123,12 @@ internal class Keepalive : TaskEngine {
       if (p.packetID != last_keepalive) {
         Log.warn($"Keepalive mismatch: {p.packetID} <> {last_keepalive}");
       } else {  
-        Log.critical("Still Alive");
+        Log.sys("Still Alive");
       }
       last_returned = true;
     }
     if (!last_returned) {
-      Log.critical("Missed keepalive, reconnecting.");
-      // _state = TaskState.Error;
-      // return;
+      Log.critical("Missed keepalive, retrying.");
     }
     p = new(PackType.Transaction, OpCode.Keepalive);
     Log.debug("Sending keepalive.");
@@ -122,6 +152,12 @@ internal class Listener : TaskEngine {
   
   private int timeout_count = 0;
   private int timeout_timeout;
+  /// <summary>
+  /// Create the listener
+  /// </summary>
+  /// <param name="ctrl">Controller object</param>
+  /// <param name="timeout">How many timeout exceptions before deciding to end the task</param>
+  /// <returns></returns>
   public Listener(Controller ctrl, int timeout=3) : base(ctrl, TE_LISTENER) {
     timeout_timeout = timeout;
     // Log.debug("Port timeout: " + controller.porter.ReadTimeout.ToString());
@@ -152,7 +188,7 @@ internal class Listener : TaskEngine {
       return;
     }
     timeout_count = 0;
-    if (pf.IsReady) {
+    if (pf.pack.isValid()) {
       // got a valid packet
       // Log.debug("Packet valid, queueing");
       controller.q_all.Enqueue(pf.pack);
@@ -165,6 +201,12 @@ internal class Listener : TaskEngine {
 internal class Consumer : TaskEngine {
   private int reconnect_timeout;
   private int current_reconnect_attempts = 0;
+  /// <summary>
+  /// Create the consumer
+  /// </summary>
+  /// <param name="ctrl">Controller object</param>
+  /// <param name="timeout">How many reconnect attempts before ending task</param>
+  /// <returns></returns>
   public Consumer(Controller ctrl, int timeout=3) : base(ctrl, TE_CONSUMER) {
     FinishWorkOnKill = true;
     reconnect_timeout = timeout;
@@ -304,7 +346,7 @@ internal class Commander : TaskEngine {
         FileLog.close();
       } else if (oc == OpCode.Initial) {
         Log.sys("Connection initialized.");
-        if (controller.IsStreaming) controller.startStreaming();
+        if (controller.UserStreaming) controller.q_user.Enqueue(OpCode.StartStream);
       }
       // reset for next command
       last_command_id = 0;
@@ -313,7 +355,8 @@ internal class Commander : TaskEngine {
   }
 }
 /// <summary>
-/// 
+/// Saves stream data to the log file and sends to controller to handle
+/// user events.
 /// </summary>
 internal class Streamer : TaskEngine {
   public Streamer(Controller ctrl) : base(ctrl, TE_STREAMER) {
