@@ -135,6 +135,12 @@ internal class TaskEngine {
 internal class Keepalive : TaskEngine {
   private int last_keepalive = 0;
   private bool last_returned = true;
+  /// <summary>
+  /// Sends the keepalive packet to the port and listens to the keepalive
+  /// queue for the response.
+  /// </summary>
+  /// <param name="ctrl"></param>
+  /// <returns></returns>
   public Keepalive(Controller ctrl) : base(ctrl, TE_KEEPALIVE) {
     last_keepalive = 0;
     last_returned = true;
@@ -175,7 +181,7 @@ internal class Listener : TaskEngine {
   private int timeout_count = 0;
   private int timeout_timeout;
   /// <summary>
-  /// Create the listener
+  /// Listens to the port, builds packets, and queues them for sorting.
   /// </summary>
   /// <param name="ctrl">Controller object</param>
   /// <param name="timeout">How many timeout exceptions before deciding to end the task</param>
@@ -228,7 +234,7 @@ internal class Consumer : TaskEngine {
   private int reconnect_timeout;
   private int current_reconnect_attempts = 0;
   /// <summary>
-  /// Create the consumer
+  /// Sorts the queued packets and hands them off to the correct queues.
   /// </summary>
   /// <param name="ctrl">Controller object</param>
   /// <param name="timeout">How many reconnect attempts before ending task</param>
@@ -334,8 +340,13 @@ internal class Commander : TaskEngine {
   private int last_command_id = 0;
   private bool last_returned = true;
   private OpCode last_command = OpCode.Unknown;
-  public Commander(Controller ctrl) : base(ctrl, TE_COMMANDER) {
-  }
+  /// <summary>
+  /// Sends commands on behalf of the user and listens for responses from
+  /// the arduino. Attempts to keep from sending the same command twice.
+  /// </summary>
+  /// <param name="ctrl"></param>
+  /// <returns></returns>
+  public Commander(Controller ctrl) : base(ctrl, TE_COMMANDER) {}
   protected override void runner() {
     OpCode op;
     Package? p;
@@ -394,6 +405,12 @@ internal class Commander : TaskEngine {
 /// user events.
 /// </summary>
 internal class Streamer : TaskEngine {
+  /// <summary>
+  /// Saves stream data to the log file and sends to controller to handle
+  /// user events.
+  /// </summary>
+  /// <param name="ctrl"></param>
+  /// <returns></returns>
   public Streamer(Controller ctrl) : base(ctrl, TE_STREAMER) {
     FinishWorkOnKill = true;
   }

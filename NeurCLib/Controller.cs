@@ -286,11 +286,13 @@ public class Controller : IDisposable {
   }
   /// <summary>
   /// Creates independent threads for each task.
-  ///   listening to the port
-  ///   consuming and sorting packages
-  ///   keepalive
-  ///   handling commands
-  ///   handling stream data
+  /// <list type="bullet">
+  ///   <item>listening to the port</item>
+  ///   <item>consuming and sorting packages</item>
+  ///   <item>keepalive</item>
+  ///   <item>handling commands</item>
+  ///   <item>handling stream data</item>
+  /// </list>
   /// If any task fails and exits, the controller attempts a reconnect.
   /// </summary>
   private void spawnTasks() {
