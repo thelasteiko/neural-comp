@@ -11,6 +11,28 @@ namespace NeurCLib;
 internal class TaskEngine {
   /// <summary>
   /// Describes the state, or requested state, of the task object.
+  /// <list type="bullet">
+  ///   <item>
+  ///     <term>Created</term>
+  ///     <description>Just constructed</description>
+  ///   <item>
+  ///   <item>
+  ///     <term>Running</term>
+  ///     <description>Run loop is running</description>
+  ///   <item>
+  ///   <item>
+  ///     <term>Timeout</term>
+  ///     <description>For tasks that use the serial port, reports a timeout error</description>
+  ///   <item>
+  ///   <item>
+  ///     <term>KillOrder</term>
+  ///     <description>Received a kill order from the controller, will exit ASAP</description>
+  ///   <item>
+  ///   <item>
+  ///     <term>Error</term>
+  ///     <description>Some other error occured, exiting the task</description>
+  ///   <item>
+  /// </list>
   /// </summary>
   public enum TaskState {
     Created,
@@ -167,12 +189,16 @@ internal class Listener : TaskEngine {
     // Log.debug("Starting new read.");
     try {
       // go until we build or fail
-      while (!pf.IsReady && controller.porter.BytesToRead > 0) {
-        // Log.debug("Bytes: " + controller.porter.BytesToRead.ToString());
-        byte b = (byte) controller.porter.ReadByte();
-        if (b >= 0) pf.build(b);
-        else break;
-        if (pf.IsFailed) throw new TimeoutException("Packet factory reset timeout.");
+      while (!pf.IsReady) {
+        if (controller.porter.BytesToRead > 0) {
+          // Log.debug("Bytes: " + controller.porter.BytesToRead.ToString());
+          byte b = (byte) controller.porter.ReadByte();
+          if (b >= 0) pf.build(b);
+          else break;
+          if (pf.IsFailed) throw new TimeoutException("Packet factory reset timeout.");
+        } else {
+          Thread.Sleep(Controller.MIN_TIMEOUT);
+        }
       }
     } catch (TimeoutException e) {
       Log.warn("Port connection timeout: " + e.Message);
@@ -223,6 +249,8 @@ internal class Consumer : TaskEngine {
         Log.critical("Unknown packet received");
         Log.debug(p.ToString(), p.toStream());
       }
+    } else if (state == TaskState.Running) {
+      Thread.Sleep(Controller.MIN_TIMEOUT);
     } else if (state == TaskState.KillOrder){
       // once the queue is depleted, die for real
       FinishWorkOnKill = false;
@@ -290,7 +318,9 @@ internal class Consumer : TaskEngine {
       Log.warn("Bad checksum on stream packet.");
       Log.debug("Packet: " + p.ToString(), p.toStream());
     }
-    controller.q_stream.Enqueue(p);
+    StreamEventArgs args = new(p.payload);
+    FileLog.write(args);
+    controller.q_stream.Enqueue(args);
   }
 }
 /// <summary>
@@ -309,6 +339,7 @@ internal class Commander : TaskEngine {
   protected override void runner() {
     OpCode op;
     Package? p;
+    // check if user sent a command
     if (controller.q_user.TryDequeue(out op)) {
       // first check if we are triggering twice
       if (op != OpCode.Initial && last_command == op) {
@@ -330,6 +361,8 @@ internal class Commander : TaskEngine {
         last_command_id = p.packetID;
         last_command = op;
       }
+    } else {
+      Thread.Sleep(Controller.MIN_TIMEOUT);
     }
     // we are waiting for a command
     if (last_command > 0 && controller.q_controls.TryDequeue(out p)) {
@@ -351,6 +384,8 @@ internal class Commander : TaskEngine {
       // reset for next command
       last_command_id = 0;
       last_command = OpCode.Unknown;
+    } else {
+      Thread.Sleep(Controller.MIN_TIMEOUT);
     }
   }
 }
@@ -363,12 +398,12 @@ internal class Streamer : TaskEngine {
     FinishWorkOnKill = true;
   }
   protected override void runner() {
-    Package? p;
-    if (controller.q_stream.TryDequeue(out p)) {
-      // got stream data, save and send
-      StreamEventArgs args = new(p.payload);
-      FileLog.write(args);
+    StreamEventArgs? args;
+    if (controller.q_stream.TryDequeue(out args)) {
+      // got stream data, send to user
       controller.handleOnStream(args);
+    } else if (state == TaskState.Running) {
+      Thread.Sleep(Controller.MIN_TIMEOUT);
     } else if (state == TaskState.KillOrder) {
       // go until we run out
       FinishWorkOnKill = false;

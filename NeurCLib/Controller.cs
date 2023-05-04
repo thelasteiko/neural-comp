@@ -8,13 +8,36 @@ namespace NeurCLib;
 public class Controller : IDisposable {
   /// <summary>
   /// Describes state of the controller object.
-  ///   Created: newly created or in the same state as new
-  ///   Opened: port is open but not connected
-  ///   Connected: port is open and we are connected
-  ///   Running: subtasks are up and running
-  ///   Restart: one of the subtasks failed and now we are restarting
-  ///   Stopping: the stop command was sent; killing tasks and closing port
-  ///   Error: something bad happened
+  /// <list type="bullet">
+  ///   <item>
+  ///     <term>Created</term>
+  ///     <description>newly created or in the same state as new</description>
+  ///   </item>
+  ///   <item>
+  ///     <term>Opened</term>
+  ///     <description>port is open but not connected</description>
+  ///   </item>
+  ///   <item>
+  ///     <term>Connected</term>
+  ///     <description>port is open and we are connected</description>
+  ///   </item>
+  ///   <item>
+  ///     <term>Running</term>
+  ///     <description>subtasks are up and running</description>
+  ///   </item>
+  ///   <item>
+  ///     <term>Restart</term>
+  ///     <description>one of the subtasks failed and now we are restarting</description>
+  ///   </item>
+  ///   <item>
+  ///     <term>Stopping</term>
+  ///     <description>the stop command was sent; killing tasks and closing port</description>
+  ///   </item>
+  ///   <item>
+  ///     <term>Error</term>
+  ///     <description>something bad happened</description>
+  ///   </item>
+  /// </list>
   /// </summary>
   public enum ControlState {
     Created,
@@ -30,6 +53,10 @@ public class Controller : IDisposable {
   /// interval for sending keepalive packets.
   /// </summary>
   internal const int MAX_TIMEOUT = 5000;
+  /// <summary>
+  /// Time to sleep threads when there is no input to process.
+  /// </summary>
+  internal const int MIN_TIMEOUT = 100;
 
   #region properties
   /// <summary>
@@ -71,7 +98,7 @@ public class Controller : IDisposable {
   /// and logged to a file.
   /// </summary>
   /// <returns></returns>
-  internal ConcurrentQueue<Package> q_stream = new();
+  internal ConcurrentQueue<StreamEventArgs> q_stream = new();
   /// <summary>
   /// Holds the currently running tasks.
   /// </summary>
@@ -115,7 +142,6 @@ public class Controller : IDisposable {
   /// Creates a new controller for interacting with the arduino.
   /// Creates but does not open the serial port.
   /// </summary>
-  /// <param name="debug"></param>
   public Controller() {
     porter = new SerialPort{
       BaudRate = 115200,
@@ -133,14 +159,19 @@ public class Controller : IDisposable {
   #region helpers
   /// <summary>
   /// Write directly to the serial port, if you really want to.
-  /// Does nothing if the port isn't open.
+  /// Does nothing if the port isn't open. Reports exceptions but
+  /// continues.
   /// </summary>
   /// <param name="buffer"></param>
   /// <param name="length"></param>
   public void Write(byte[] buffer, int length) {
     if (!porter.IsOpen) return;
     lock (write_mutex) {
-      porter.Write(buffer, 0, length);
+      try {
+        porter.Write(buffer, 0, length);
+      } catch (Exception e) {
+        Log.critical(String.Format("{0}: {1}", e.GetType().Name, e.Message));
+      }
     }
   }
   /// <summary>
@@ -310,7 +341,6 @@ public class Controller : IDisposable {
   /// <returns></returns>
   private bool sendConnect() {
     Package p = new(PackType.Transaction, OpCode.Initial);
-    p.initial();
     Log.debug("Sending intial connect");
     byte[] buffer = new byte[p.length];
     // try three times
