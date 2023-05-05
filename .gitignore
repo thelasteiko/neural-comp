@@ -8,6 +8,8 @@ NeurCApp/obj/Debug/net6.0/ref/*.dll
 NeurCApp/obj/Debug/net6.0/refint/*.dll
 NeurCApp/obj/*.cache
 
+NeurCApp/obj/Debug/net6.0/NeurCApp.GeneratedMSBuildEditorConfig.editorconfig
+
 NeurCLib/bin/*
 NeurCLib/obj/Debug/net6.0/*.cache
 NeurCLib/obj/Debug/net6.0/*.dll

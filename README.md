@@ -34,5 +34,3 @@ The program will start by attempting to connect to the arduino.
 The app just links to the dll in the debug folder of the library. Make sure to build the library before you try to run the app.
 
 One artifact of testing with the arduino was that sometimes, after the arduino reset while the data stream was running, restarting the stream took a few more seconds to come back after the connect was acknowledged and the keepalive started.
-
-I put handling the user events and saving data to the log in the same thread....for project 2 this seemed to be enough but I will consider separating that for the next iteration.

@@ -401,13 +401,12 @@ internal class Commander : TaskEngine {
   }
 }
 /// <summary>
-/// Saves stream data to the log file and sends to controller to handle
+/// Hands off stream data to the user client via the controller's stream event.
 /// user events.
 /// </summary>
 internal class Streamer : TaskEngine {
   /// <summary>
-  /// Saves stream data to the log file and sends to controller to handle
-  /// user events.
+  /// Hands off stream data to the user client via the controller's stream event.
   /// </summary>
   /// <param name="ctrl"></param>
   /// <returns></returns>
