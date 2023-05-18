@@ -1,0 +1,1 @@
+https://stackoverflow.com/questions/64633727/how-to-fix-running-scripts-is-disabled-on-this-system
