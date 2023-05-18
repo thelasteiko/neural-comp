@@ -328,11 +328,13 @@ public class Controller : IDisposable {
         porter.DiscardOutBuffer();
       } catch (System.Exception) {
         Log.warn($"Failed to open '{ports[i]}'");
+        if (porter.IsOpen) porter.Close();
         continue;
       }
       Log.debug("Connected to " + ports[i]);
       _status = ControlState.Opened;
       if (sendConnect()) return true;
+      else if(porter.IsOpen) porter.Close();
     }
     return false;
   }
@@ -447,7 +449,7 @@ public class Controller : IDisposable {
     if (porter is not null && porter.IsOpen) {
       porter.Close();
     }
-    // ClearQueues();
+    ClearQueues();
     _status = ControlState.Created;
   }
   /// <summary>

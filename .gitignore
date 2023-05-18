@@ -23,3 +23,5 @@ NeurCLib/obj/NeurCLib.csproj.nuget.dgspec.json
 *.csv
 *.dll
 *.exe
+
+neural-classy/machine-learning

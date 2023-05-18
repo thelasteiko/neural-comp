@@ -150,7 +150,7 @@ internal class Keepalive : TaskEngine {
     if(last_keepalive > 0 && controller.q_keepalive.TryDequeue(out p)) {
       if (p.packetID != last_keepalive) {
         Log.warn($"Keepalive mismatch: {p.packetID} <> {last_keepalive}");
-      } else {  
+      } else {
         Log.sys("Still Alive");
       }
       last_returned = true;
