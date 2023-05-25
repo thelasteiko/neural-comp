@@ -2,6 +2,19 @@
   "version": 3,
   "targets": {
     "net6.0": {
+      "MathNet.Numerics/5.0.0": {
+        "type": "package",
+        "compile": {
+          "lib/net6.0/MathNet.Numerics.dll": {
+            "related": ".xml"
+          }
+        },
+        "runtime": {
+          "lib/net6.0/MathNet.Numerics.dll": {
+            "related": ".xml"
+          }
+        }
+      },
       "runtime.linux-arm.runtime.native.System.IO.Ports/7.0.0": {
         "type": "package",
         "runtimeTargets": {
@@ -89,6 +102,28 @@
     }
   },
   "libraries": {
+    "MathNet.Numerics/5.0.0": {
+      "sha512": "pg1W2VwaEQMAiTpGK840hZgzavnqjlCMTVSbtVCXVyT+7AX4mc1o89SPv4TBlAjhgCOo9c1Y+jZ5m3ti2YgGgA==",
+      "type": "package",
+      "path": "mathnet.numerics/5.0.0",
+      "files": [
+        ".nupkg.metadata",
+        ".signature.p7s",
+        "icon.png",
+        "lib/net461/MathNet.Numerics.dll",
+        "lib/net461/MathNet.Numerics.xml",
+        "lib/net48/MathNet.Numerics.dll",
+        "lib/net48/MathNet.Numerics.xml",
+        "lib/net5.0/MathNet.Numerics.dll",
+        "lib/net5.0/MathNet.Numerics.xml",
+        "lib/net6.0/MathNet.Numerics.dll",
+        "lib/net6.0/MathNet.Numerics.xml",
+        "lib/netstandard2.0/MathNet.Numerics.dll",
+        "lib/netstandard2.0/MathNet.Numerics.xml",
+        "mathnet.numerics.5.0.0.nupkg.sha512",
+        "mathnet.numerics.nuspec"
+      ]
+    },
     "runtime.linux-arm.runtime.native.System.IO.Ports/7.0.0": {
       "sha512": "CBvgRaF+M0xGLDv2Geb/0v0LEADheH8aK72GRAUJdnqnJVsQO60ki1XO8M3keEhnjm+T5NvLm41pNXAVYAPiSg==",
       "type": "package",
@@ -222,6 +257,7 @@
   },
   "projectFileDependencyGroups": {
     "net6.0": [
+      "MathNet.Numerics >= 5.0.0",
       "System.IO.Ports >= 7.0.0"
     ]
   },
@@ -262,6 +298,10 @@
       "net6.0": {
         "targetAlias": "net6.0",
         "dependencies": {
+          "MathNet.Numerics": {
+            "target": "Package",
+            "version": "[5.0.0, )"
+          },
           "System.IO.Ports": {
             "target": "Package",
             "version": "[7.0.0, )"

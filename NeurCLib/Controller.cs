@@ -72,7 +72,11 @@ public class Controller : IDisposable {
   /// <summary>
   /// Handler for when we get stream data.
   /// </summary>
-  public event EventHandler<StreamEventArgs>? Stream;
+  public event EventHandler<StreamEventArgs>? StreamData;
+  public event EventHandler? StreamStarted;
+  public event EventHandler? StreamStopped;
+  public event EventHandler? TherapyStarted;
+  public event EventHandler? TherapyStopped;
   /// <summary>
   /// Queue for packages from the arduino to be processed.
   /// </summary>
@@ -87,18 +91,19 @@ public class Controller : IDisposable {
   /// Queue for commands from the user.
   /// </summary>
   /// <returns></returns>
-  internal ConcurrentQueue<OpCode> q_user = new();
+  internal ConcurrentQueue<OpCode> q_commands = new();
   /// <summary>
   /// Queue for the responses to commands.
   /// </summary>
   /// <returns></returns>
-  internal ConcurrentQueue<Package> q_controls = new();
+  internal ConcurrentQueue<Package> q_command_responses = new();
   /// <summary>
   /// Queue for stream packets, to be sent via the Stream handler
   /// and logged to a file.
   /// </summary>
   /// <returns></returns>
   internal ConcurrentQueue<StreamEventArgs> q_stream = new();
+  internal ConcurrentQueue<Package> q_client_events = new();
   /// <summary>
   /// Holds the currently running tasks.
   /// </summary>
@@ -116,7 +121,7 @@ public class Controller : IDisposable {
   /// </summary>
   public int KillTimeout = MAX_TIMEOUT / 10;
   internal System.Threading.Mutex stream_lock = new();
-  private bool __IsStreaming = false;
+  private bool __IsStreaming = true;
   internal bool _IsStreaming {
     get => __IsStreaming;
     set {
@@ -129,7 +134,7 @@ public class Controller : IDisposable {
   /// </summary>
   /// <value></value>
   public bool IsStreaming {get => _IsStreaming;}
-  private bool _UserStreaming = false;
+  private bool _UserStreaming = true;
   /// <summary>
   /// The stream state the user last requested.
   /// </summary>
@@ -189,8 +194,8 @@ public class Controller : IDisposable {
   private void ClearQueues() {
     q_all.Clear();
     q_keepalive.Clear();
-    q_user.Clear();
-    q_controls.Clear();
+    q_commands.Clear();
+    q_command_responses.Clear();
     q_stream.Clear();
   }
   /// <summary>
@@ -234,25 +239,45 @@ public class Controller : IDisposable {
   internal bool IsAlive() {
     return task_bag.Count > 0;
   }
+  internal void handleEvent(EventHandler? ev) {
+    if (ev is not null) {
+      Delegate[] degs = ev.GetInvocationList();
+      for (int i = 0; i < degs.Length; i++) {
+        degs[i].DynamicInvoke(this);
+      }
+    }
+  }
   /// <summary>
   /// Sends the stream data via the registered stream events.
   /// </summary>
   /// <param name="args"></param>
   internal void handleOnStream(StreamEventArgs args) {
     // Log.debug("Triggering invokes");
-    if (Stream is not null) {
-      Delegate[] degs = Stream.GetInvocationList();
+    if (StreamData is not null) {
+      Delegate[] degs = StreamData.GetInvocationList();
       for (int i = 0; i < degs.Length; i++) {
         degs[i].DynamicInvoke(this, args);
       }
     }
+  }
+  internal void handleOnStreamStart() {
+    handleEvent(StreamStarted);
+  }
+  internal void handleOnStreamStop() {
+    handleEvent(StreamStopped);
+  }
+  internal void handleOnTherapyStart() {
+    handleEvent(TherapyStarted);
+  }
+  internal void handleOnTherapyStop() {
+    handleEvent(TherapyStopped);
   }
   /// <summary>
   /// Helper that pauses an awaiting thread for some interval
   /// and prints a waiting 'bar' as an indicator.
   /// </summary>
   /// <returns></returns>
-  public async Task doAWait(int steps=5, int sleepFor=1000) {
+  public static async Task doAWait(int steps=5, int sleepFor=1000) {
     await Task.Factory.StartNew(() => {
       for (int i = 0; i < steps; i++){
         Thread.Sleep(sleepFor);
@@ -278,7 +303,7 @@ public class Controller : IDisposable {
       }
     });
     if (status == ControlState.Running) {
-      if (IsStreaming) {
+      if (IsStreaming || UserStreaming) {
         _IsStreaming = false;
         startStreaming();
       }
@@ -334,7 +359,7 @@ public class Controller : IDisposable {
       Log.debug("Connected to " + ports[i]);
       _status = ControlState.Opened;
       if (sendConnect()) return true;
-      else if(porter.IsOpen) porter.Close();
+      else if (porter.IsOpen) porter.Close();
     }
     return false;
   }
@@ -382,7 +407,7 @@ public class Controller : IDisposable {
     return false;
   }
   internal void sendConnectAsync() {
-    q_user.Enqueue(OpCode.Initial);
+    q_commands.Enqueue(OpCode.Initial);
   }
   /// <summary>
   /// Sends the kill order to all threads and waits for a bit.
@@ -426,7 +451,7 @@ public class Controller : IDisposable {
       spawnTasks();
       _status = ControlState.Running;
       if (UserStreaming) {
-        q_user.Enqueue(OpCode.StartStream);
+        q_commands.Enqueue(OpCode.StartStream);
       }
     } else {
       //await doAWait();
@@ -449,7 +474,7 @@ public class Controller : IDisposable {
     if (porter is not null && porter.IsOpen) {
       porter.Close();
     }
-    ClearQueues();
+    //ClearQueues();
     _status = ControlState.Created;
   }
   /// <summary>
@@ -485,7 +510,7 @@ public class Controller : IDisposable {
   public void startStreaming() {
     if (!StreamCheck(true)) return;
     _UserStreaming = true;
-    q_user.Enqueue(OpCode.StartStream);
+    q_commands.Enqueue(OpCode.StartStream);
     Log.sys("Start stream command sent.");
   }
   /// <summary>
@@ -496,7 +521,7 @@ public class Controller : IDisposable {
   public void stopStreaming() {
     if (!StreamCheck(false)) return;
     _UserStreaming = false;
-    q_user.Enqueue(OpCode.StopStream);
+    q_commands.Enqueue(OpCode.StopStream);
     Log.sys("Stop stream command sent.");
   }
   /// <summary>

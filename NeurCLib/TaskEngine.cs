@@ -61,6 +61,7 @@ internal class TaskEngine {
   /// Name of the streamer task
   /// </summary>
   public const String TE_STREAMER = "streamer";
+  public const String TE_NOTIFIER = "notifier";
   protected Mutex state_lock = new();
   protected TaskState __state;
   protected TaskState _state {
@@ -247,10 +248,9 @@ internal class Consumer : TaskEngine {
     Package? p;
     if (controller.q_all.TryDequeue(out p)) {
       // see what we got
-      PackType pt = (PackType) p.packetType;
-      if (pt is PackType.Failure) handleError(p);
-      else if (pt is PackType.Transaction) handleTransaction(p);
-      else if (pt is PackType.Stream) handleStream(p);
+      if (p.isFailure()) handleError(p);
+      else if (p.isTransaction()) handleTransaction(p);
+      else if (p.isStream()) handleStream(p);
       else {
         Log.critical("Unknown packet received");
         Log.debug(p.ToString(), p.toStream());
@@ -283,6 +283,8 @@ internal class Consumer : TaskEngine {
       ErrorType.AlreadyConnected => "Already connected",
       ErrorType.AlreadyStreaming => "Already streaming",
       ErrorType.AlreadyStopped => "Already stopped streaming",
+      ErrorType.AlreadyTherapy => "Already administering therapy",
+      ErrorType.AlreadyNotTherapy => "Already stopped therapy",
       ErrorType.NotConnected => "Not connected",
       _ => throw new ArgumentOutOfRangeException(errorType.ToString(), $"Unexpected error: {errorType.ToString()}")
     };
@@ -310,7 +312,7 @@ internal class Consumer : TaskEngine {
       controller.q_keepalive.Enqueue(p);
     } else if (opc.In(OpCode.StartStream, OpCode.StopStream, OpCode.Initial)) {
       // Log.debug("Command:", p.toStream());
-      controller.q_controls.Enqueue(p);
+      controller.q_command_responses.Enqueue(p);
     }
   }
   /// <summary>
@@ -325,7 +327,7 @@ internal class Consumer : TaskEngine {
       Log.debug("Packet: " + p.ToString(), p.toStream());
     }
     StreamEventArgs args = new(p.payload);
-    FileLog.write(args);
+    //FileLog.write(args);
     controller.q_stream.Enqueue(args);
   }
 }
@@ -351,7 +353,7 @@ internal class Commander : TaskEngine {
     OpCode op;
     Package? p;
     // check if user sent a command
-    if (controller.q_user.TryDequeue(out op)) {
+    if (controller.q_commands.TryDequeue(out op)) {
       // first check if we are triggering twice
       if (op != OpCode.Initial && last_command == op) {
         Log.sys("Command sent, please wait.");
@@ -376,7 +378,7 @@ internal class Commander : TaskEngine {
       Thread.Sleep(Controller.MIN_TIMEOUT);
     }
     // we are waiting for a command
-    if (last_command > 0 && controller.q_controls.TryDequeue(out p)) {
+    if (last_command > 0 && controller.q_command_responses.TryDequeue(out p)) {
       if (p.packetID != last_command_id) {
         Log.warn($"Command mismatch: {p.packetID} <> {last_command}");
       }
@@ -390,7 +392,7 @@ internal class Commander : TaskEngine {
         FileLog.close();
       } else if (oc == OpCode.Initial) {
         Log.sys("Connection initialized.");
-        if (controller.UserStreaming) controller.q_user.Enqueue(OpCode.StartStream);
+        if (controller.UserStreaming) controller.q_commands.Enqueue(OpCode.StartStream);
       }
       // reset for next command
       last_command_id = 0;
@@ -405,6 +407,8 @@ internal class Commander : TaskEngine {
 /// user events.
 /// </summary>
 internal class Streamer : TaskEngine {
+  SignalWindow window = new();
+  bool seizure_detected;
   /// <summary>
   /// Hands off stream data to the user client via the controller's stream event.
   /// </summary>
@@ -416,8 +420,47 @@ internal class Streamer : TaskEngine {
   protected override void runner() {
     StreamEventArgs? args;
     if (controller.q_stream.TryDequeue(out args)) {
-      // got stream data, send to user
-      controller.handleOnStream(args);
+      window.add(args.microvolts);
+      if (window.PredictReady) {
+        seizure_detected = window.predict();
+      }
+      if (seizure_detected) {
+        // TODO and not therapy on
+        // TODO send start stim
+      }
+      // log to file; TODO where am I storing therapy?
+      FileLog.write(args, seizure_detected, );
+    }
+  }
+}
+internal class Notifier : TaskEngine {
+  public Notifier(Controller ctrl) : base(ctrl, TE_NOTIFIER) {}
+
+  protected override void runner() {
+    Package? p;
+    if (controller.q_client_events.TryDequeue(out p)) {
+      
+      if (p.isStream()) {
+        StreamEventArgs args = new(p.payload);
+        controller.handleOnStream(args);
+      } else if (p.isCommand()) {
+        OpCode c = p.opCode;
+        switch (c) {
+          case OpCode.StartStream:
+            controller.handleOnStreamStart();
+            break;
+          case OpCode.StopStream:
+            controller.handleOnStreamStop();
+            break;
+          case OpCode.StartStim:
+            controller.handleOnTherapyStart();
+            break;
+          case OpCode.StopStim:
+            controller.handleOnTherapyStop();
+            break;
+        }
+      }
+      
     } else if (state == TaskState.Running) {
       Thread.Sleep(Controller.MIN_TIMEOUT);
     } else if (state == TaskState.KillOrder) {

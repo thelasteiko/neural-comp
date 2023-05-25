@@ -41,6 +41,7 @@ public sealed class Log {
     // string padded by zeroes
     return interval.TotalMilliseconds.ToString().PadLeft(12, '0');
   }
+  
   /// <summary>
   /// Builds the log message with a standard header.
   /// </summary>
@@ -192,7 +193,10 @@ public sealed class Log {
 /// The file log prints stream data and start/stop events to a log file.
 /// Ensures log files do not exceed 2MB.
 /// Filename format: <date>-<time>-<iteration>.csv
-/// Record format: <log timestamp>,<packet timestamp>,<microvolts>
+/// If log level is Debug...
+/// Record format: <log timestamp>,<packet timestamp>,<microvolts>,<classification>,<therapy>
+/// If log level is SysMsg...
+/// Record format: <packet timestamp>,<microvolts>,<classification>,<therapy>
 /// </summary>
 internal sealed class FileLog : IDisposable{
   /// <summary>
@@ -227,7 +231,7 @@ internal sealed class FileLog : IDisposable{
     if (IsOpen) return;
     current_stamp = DateTime.Now;
     _incrementLog();
-    _write("0,start stream");
+    //_write("0,start stream");
     Log.debug("Starting log");
   }
   /// <summary>
@@ -241,7 +245,12 @@ internal sealed class FileLog : IDisposable{
     if (bytes_written >= MAX_FILE_SIZE) {
       _incrementLog();
     }
-    string s = Log.instance().timestamp() + "," + msg;
+    string s;
+    if (Log.instance().LogLevel >= Log.Levels.Debug) {
+      s = Log.instance().timestamp() + "," + msg;
+    } else {
+      s = msg;
+    }
     bytes_written += s.Length;
     log_stream?.WriteLine(s);
   }
@@ -249,10 +258,9 @@ internal sealed class FileLog : IDisposable{
   /// Write the stream data to the log file.
   /// </summary>
   /// <param name="args"></param>
-  public void _write(StreamEventArgs args) {
+  public void _write(StreamEventArgs args, bool seizure_detected, bool therapy_on) {
     // format packet data
-    string msg = $"{args.timestamp},{args.microvolts}";
-    _write(msg);
+    _write($"{args.timestamp},{args.microvolts},{seizure_detected},{therapy_on}");
   }
   /// <summary>
   /// Close the log and dispose the stream writer.
@@ -260,7 +268,7 @@ internal sealed class FileLog : IDisposable{
   public void _close() {
     if (!IsOpen) return;
     log_index = 0;
-    _write("0,stop stream");
+    //_write("0,stop stream");
     _IsOpen = false;
     log_stream?.Dispose();
     Log.debug("Closing log");
@@ -286,8 +294,8 @@ internal sealed class FileLog : IDisposable{
   /// Write the stream data to the log file.
   /// </summary>
   /// <param name="args"></param>
-  public static void write(StreamEventArgs args) {
-    instance()._write(args);
+  public static void write(StreamEventArgs args, bool seizure_detected, bool therapy_on) {
+    instance()._write(args, seizure_detected, therapy_on);
   }
   /// <summary>
   /// Close the log and dispose the stream writer.

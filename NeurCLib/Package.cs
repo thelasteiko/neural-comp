@@ -82,6 +82,8 @@ public enum ErrorType {
   AlreadyStreaming,
   AlreadyStopped,
   NotConnected,
+  AlreadyTherapy,
+  AlreadyNotTherapy,
   Unknown
 }
 /// <summary>
@@ -114,6 +116,8 @@ public enum OpCode : byte {
   Keepalive = 0x02,
   StartStream = 0x03,
   StopStream = 0x04,
+  StartStim = 0x05,
+  StopStim = 0x06,
   Unknown
 }
 #endregion
@@ -160,6 +164,9 @@ public class Package {
   /// Checksum is the sum of all bytes, header to payload, except the checksum.
   /// </summary>
   public byte checksum = 0;
+  public OpCode opCode {
+    get => (OpCode) payload[0];
+  }
   /// <summary>
   /// Create a blank packet, normally used for building one read from
   /// the serial port.
@@ -328,6 +335,22 @@ public class Package {
     if (check == checksum) return true;
     checksum = check;
     return false;
+  }
+  public bool isTransaction() {
+    return ((PackType) packetType) == PackType.Transaction;
+  }
+  public bool isCommand() {
+    return (isTransaction() && ((OpCode) payload[0]).In(
+      OpCode.StartStim, OpCode.StopStim, OpCode.StartStream, OpCode.StopStream));
+  }
+  public bool isStream() {
+    return ((PackType) packetType) == PackType.Stream;
+  }
+  public bool isFailure() {
+    return ((PackType) packetType) == PackType.Failure;
+  }
+  public bool isKeepalive() {
+    return isTransaction() && ((OpCode) payload[0] == OpCode.Keepalive);
   }
   /// <summary>
   /// Increments for each packet sent to provide a unique ID for each.
