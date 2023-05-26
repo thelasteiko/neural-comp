@@ -373,7 +373,8 @@ public class PackFactory {
   public Package pack {
     get => _pack;
   }
-  private int current_byte;
+  private int current_byte = 0;
+  private byte failed_byte = 0;
   private bool reset = true;
   private int reset_count = 0;
   private int reset_timeout = 50;
@@ -413,6 +414,10 @@ public class PackFactory {
       _pack = new();
       current_byte = 0;
       reset = false;
+      if (failed_byte == Package.Header[0]) {
+        build(failed_byte);
+        failed_byte = 0;
+      }
       reset_count++;
       // Log.debug("Reset packet factory.");
     }
@@ -420,6 +425,7 @@ public class PackFactory {
     // all headers are set, we are synced
     if (!_pack.setByte(current_byte, b)) {
       // Log.debug($"Could not set {current_byte}={b.ToString("X2")}: ", pack.toStream());
+      failed_byte = b;
       reset = true;
     }
     current_byte += 1;

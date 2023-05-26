@@ -199,8 +199,8 @@ internal class Listener : TaskEngine {
       while (!pf.IsReady) {
         if (controller.porter.BytesToRead > 0) {
           // Log.debug("Bytes: " + controller.porter.BytesToRead.ToString());
-          byte b = (byte) controller.porter.ReadByte();
-          if (b >= 0) pf.build(b);
+          int b = controller.porter.ReadByte();
+          if (b >= 0) pf.build((byte) b);
           else break;
           if (pf.IsFailed) throw new TimeoutException("Packet factory reset timeout.");
         } else {
@@ -329,6 +329,7 @@ internal class Consumer : TaskEngine {
     StreamEventArgs args = new(p.payload);
     //FileLog.write(args);
     controller.q_stream.Enqueue(args);
+    controller.q_command_responses.Enqueue(p);
   }
 }
 /// <summary>
@@ -385,13 +386,22 @@ internal class Commander : TaskEngine {
       last_returned = true;
       OpCode oc = (OpCode)p.payload[0];
       if (oc == OpCode.StartStream) {
+        controller.StartStreamSent = false;
         controller._IsStreaming = true;
         FileLog.create();
       } else if (oc == OpCode.StopStream) {
+        controller.StopStreamSent = false;
         controller._IsStreaming = false;
         FileLog.close();
+      } else if (oc == OpCode.StartStim) {
+        controller.StartStimSent = false;
+        controller._IsStimming = true;
+      } else if (oc == OpCode.StopStim) {
+        controller.StopStimSent = false;
+        controller._IsStimming = false;
       } else if (oc == OpCode.Initial) {
         Log.sys("Connection initialized.");
+        // TODO may have to rethink using user streaming
         if (controller.UserStreaming) controller.q_commands.Enqueue(OpCode.StartStream);
       }
       // reset for next command
@@ -424,22 +434,25 @@ internal class Streamer : TaskEngine {
       if (window.PredictReady) {
         seizure_detected = window.predict();
       }
-      if (seizure_detected) {
-        // TODO and not therapy on
-        // TODO send start stim
+      if (seizure_detected && !controller.IsStimming) {
+        controller.startTherapy();
       }
-      // log to file; TODO where am I storing therapy?
-      FileLog.write(args, seizure_detected, );
+      FileLog.write(args, seizure_detected, controller.IsStimming);
+    } else if (state == TaskState.Running) {
+      Thread.Sleep(Controller.MIN_TIMEOUT);
+    } else if (state == TaskState.KillOrder) {
+      FinishWorkOnKill = false;
     }
   }
 }
 internal class Notifier : TaskEngine {
-  public Notifier(Controller ctrl) : base(ctrl, TE_NOTIFIER) {}
+  public Notifier(Controller ctrl) : base(ctrl, TE_NOTIFIER) {
+    FinishWorkOnKill = true;
+  }
 
   protected override void runner() {
     Package? p;
     if (controller.q_client_events.TryDequeue(out p)) {
-      
       if (p.isStream()) {
         StreamEventArgs args = new(p.payload);
         controller.handleOnStream(args);

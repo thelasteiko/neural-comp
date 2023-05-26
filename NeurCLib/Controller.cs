@@ -134,6 +134,8 @@ public class Controller : IDisposable {
   /// </summary>
   /// <value></value>
   public bool IsStreaming {get => _IsStreaming;}
+  internal bool StartStreamSent = false;
+  internal bool StopStreamSent = false;
   private bool _UserStreaming = true;
   /// <summary>
   /// The stream state the user last requested.
@@ -141,6 +143,12 @@ public class Controller : IDisposable {
   internal bool UserStreaming {
     get => _UserStreaming;
   }
+  internal bool _IsStimming = false;
+  public bool IsStimming {
+    get => _IsStimming || StartStimSent;
+  }
+  internal bool StartStimSent = false;
+  internal bool StopStimSent = false;
   private bool disposed = false;
   #endregion
   /// <summary>
@@ -239,7 +247,7 @@ public class Controller : IDisposable {
   internal bool IsAlive() {
     return task_bag.Count > 0;
   }
-  internal void handleEvent(EventHandler? ev) {
+  private void handleEvent(EventHandler? ev) {
     if (ev is not null) {
       Delegate[] degs = ev.GetInvocationList();
       for (int i = 0; i < degs.Length; i++) {
@@ -364,8 +372,8 @@ public class Controller : IDisposable {
     return false;
   }
   /// <summary>
-  /// Helper for sending the initial connect request.
-  /// Assumes the port is open.
+  /// Helper for sending the very first initial connect request after
+  /// connecting to a port.
   /// </summary>
   /// <returns></returns>
   private bool sendConnect() {
@@ -406,8 +414,17 @@ public class Controller : IDisposable {
     }
     return false;
   }
+  /// <summary>
+  /// Resend initial connect command after a simulated disconnect.
+  /// </summary>
   internal void sendConnectAsync() {
     q_commands.Enqueue(OpCode.Initial);
+    // reset state
+    _IsStimming = false;
+    StartStreamSent = false;
+    StopStreamSent = false;
+    StartStimSent = false;
+    StopStimSent = false;
   }
   /// <summary>
   /// Sends the kill order to all threads and waits for a bit.
@@ -509,6 +526,11 @@ public class Controller : IDisposable {
   /// <returns></returns>
   public void startStreaming() {
     if (!StreamCheck(true)) return;
+    if (StartStreamSent) {
+      Log.debug("Start stream already sent.");
+      return;
+    }
+    StartStreamSent = true;
     _UserStreaming = true;
     q_commands.Enqueue(OpCode.StartStream);
     Log.sys("Start stream command sent.");
@@ -520,9 +542,39 @@ public class Controller : IDisposable {
   /// <returns></returns>
   public void stopStreaming() {
     if (!StreamCheck(false)) return;
+    if (StopStreamSent) {
+      Log.debug("Stop stream already sent.");
+      return;
+    }
+    StopStreamSent = true;
     _UserStreaming = false;
     q_commands.Enqueue(OpCode.StopStream);
     Log.sys("Stop stream command sent.");
+  }
+
+  public void startTherapy() {
+    if (StartStimSent) {
+      Log.debug("Stim command already sent.");
+      return;
+    }
+    if (IsStimming) {
+      Log.debug("Already stimming");
+      return;
+    }
+    StartStimSent = true;
+    q_commands.Enqueue(OpCode.StartStim);
+  }
+  public void stopTherapy() {
+    if (StopStimSent) {
+      Log.debug("Stop Stime command already sent.");
+      return;
+    }
+    if (!IsStimming) {
+      Log.sys("Therapy not being administered.");
+      return;
+    }
+    StopStimSent = true;
+    q_commands.Enqueue(OpCode.StopStim);
   }
   /// <summary>
   /// Kills any running tasks, closes the port and log if open.
