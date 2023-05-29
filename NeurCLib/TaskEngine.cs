@@ -9,6 +9,7 @@ namespace NeurCLib;
 /// tasks to track state and some parameters.
 /// </summary>
 internal class TaskEngine {
+  #region parameters
   /// <summary>
   /// Describes the state, or requested state, of the task object.
   /// <list type="bullet">
@@ -61,12 +62,16 @@ internal class TaskEngine {
   /// Name of the streamer task
   /// </summary>
   public const String TE_STREAMER = "streamer";
+  /// <summary>
+  /// Name of the notifier
+  /// </summary>
   public const String TE_NOTIFIER = "notifier";
   protected Mutex state_lock = new();
   protected TaskState __state;
   protected TaskState _state {
     get => __state;
     set {
+      Log.debug(_name + " set state " + value);
       lock(state_lock) {__state = value;}
     }
   }
@@ -91,6 +96,7 @@ internal class TaskEngine {
   /// Some tasks can continue in order to clear queues before dying.
   /// </summary>
   protected bool FinishWorkOnKill = false;
+  #endregion
   /// <summary>
   /// Create a task with a name
   /// </summary>
@@ -98,8 +104,8 @@ internal class TaskEngine {
   /// <param name="n">Name of the task</param>
   public TaskEngine(Controller ctrl, string n) {
     controller = ctrl;
-    _state = TaskState.Created;
     _name = n;
+    _state = TaskState.Created;
     Log.debug($"Task '{_name}' created.");
   }
   /// <summary>
@@ -310,7 +316,7 @@ internal class Consumer : TaskEngine {
     OpCode opc = (OpCode) p.payload[0];
     if (opc == OpCode.Keepalive) {
       controller.q_keepalive.Enqueue(p);
-    } else if (opc.In(OpCode.StartStream, OpCode.StopStream, OpCode.Initial)) {
+    } else if (opc.In(OpCode.StartStream, OpCode.StopStream, OpCode.Initial, OpCode.StartStim, OpCode.StopStim)) {
       // Log.debug("Command:", p.toStream());
       controller.q_command_responses.Enqueue(p);
     }
@@ -329,7 +335,7 @@ internal class Consumer : TaskEngine {
     StreamEventArgs args = new(p.payload);
     //FileLog.write(args);
     controller.q_stream.Enqueue(args);
-    controller.q_command_responses.Enqueue(p);
+    controller.q_client_events.Enqueue(p);
   }
 }
 /// <summary>
@@ -375,13 +381,12 @@ internal class Commander : TaskEngine {
         last_command_id = p.packetID;
         last_command = op;
       }
-    } else {
-      Thread.Sleep(Controller.MIN_TIMEOUT);
     }
+    Thread.Sleep(Controller.MIN_TIMEOUT);
     // we are waiting for a command
     if (last_command > 0 && controller.q_command_responses.TryDequeue(out p)) {
       if (p.packetID != last_command_id) {
-        Log.warn($"Command mismatch: {p.packetID} <> {last_command}");
+        Log.warn($"Command mismatch: {p.packetID}|{p.opCode} <> {last_command_id}|{last_command}");
       }
       last_returned = true;
       OpCode oc = (OpCode)p.payload[0];
@@ -413,8 +418,7 @@ internal class Commander : TaskEngine {
   }
 }
 /// <summary>
-/// Hands off stream data to the user client via the controller's stream event.
-/// user events.
+/// Processes stream data to save to file and predict if there is a seizure happening.
 /// </summary>
 internal class Streamer : TaskEngine {
   SignalWindow window = new();
@@ -431,9 +435,12 @@ internal class Streamer : TaskEngine {
     StreamEventArgs? args;
     if (controller.q_stream.TryDequeue(out args)) {
       window.add(args.microvolts);
+      Log.debug($"Added signal # {window.Count}: {args.microvolts}");
       if (window.PredictReady) {
+        // Log.debug("window is prediction ready");
         seizure_detected = window.predict();
       }
+      Log.debug("Controller is stimming: " + controller.IsStimming.ToString());
       if (seizure_detected && !controller.IsStimming) {
         controller.startTherapy();
       }

@@ -1,0 +1,17 @@
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.csproj.AssemblyReference.cache
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.GeneratedMSBuildEditorConfig.editorconfig
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.AssemblyInfoInputs.cache
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.AssemblyInfo.cs
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.csproj.CoreCompileInputs.cache
+c:\Users\memre\Documents\git-repos\neural-comp\test\bin\Debug\net6.0\test.exe
+c:\Users\memre\Documents\git-repos\neural-comp\test\bin\Debug\net6.0\test.deps.json
+c:\Users\memre\Documents\git-repos\neural-comp\test\bin\Debug\net6.0\test.runtimeconfig.json
+c:\Users\memre\Documents\git-repos\neural-comp\test\bin\Debug\net6.0\test.dll
+c:\Users\memre\Documents\git-repos\neural-comp\test\bin\Debug\net6.0\test.pdb
+c:\Users\memre\Documents\git-repos\neural-comp\test\bin\Debug\net6.0\MathNet.Numerics.dll
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.csproj.CopyComplete
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.dll
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\refint\test.dll
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.pdb
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\test.genruntimeconfig.cache
+c:\Users\memre\Documents\git-repos\neural-comp\test\obj\Debug\net6.0\ref\test.dll

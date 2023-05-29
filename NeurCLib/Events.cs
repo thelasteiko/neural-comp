@@ -21,7 +21,8 @@ public class StreamEventArgs : EventArgs {
     // first 4 are timestamp
     timestamp = BinaryPrimitives.ReadUInt32LittleEndian(payload);
     // last 2 is neural data
-    raw = BinaryPrimitives.ReadUInt16LittleEndian(payload.Skip(4).ToArray());
+    //raw = BinaryPrimitives.ReadUInt16LittleEndian(payload.Skip(4).ToArray());
+    raw = (ushort) (payload[4] | payload[5] << 8);
     // convert raw data to uV
     microvolts = raw / 65536.0 * DYNAMIC_RANGE + X_MIN;
   }

@@ -1,0 +1,10 @@
+{
+  "version": 2,
+  "dgSpecHash": "sDHdFn25my5VMF46+DGBR0NS+GbukPdEU3GMjL4YTRIVeibqM83LPrOh+MZYR+8+EvUkcGiOq5UdmkEsgyGxMw==",
+  "success": true,
+  "projectFilePath": "c:\\Users\\memre\\Documents\\git-repos\\neural-comp\\test\\test.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\memre\\.nuget\\packages\\mathnet.numerics\\5.0.0\\mathnet.numerics.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}

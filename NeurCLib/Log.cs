@@ -140,6 +140,16 @@ public sealed class Log {
       Console.WriteLine(ByteToString(buffer));
     }
   }
+
+  public static void debug<T>(string msg, T[] ary,
+      [CallerMemberName] string callerName="",
+      [CallerFilePath] string filepath="",
+      [CallerLineNumber] int linenum=0) {
+    lock(logmutex) {
+      instance()._debug(msg, callerName, filepath, linenum);
+      Console.WriteLine("[{0}]", string.Join(", ", ary));
+    }
+  }
   public static void warn(string msg,
       [CallerMemberName] string callerName="",
       [CallerFilePath] string filepath="",

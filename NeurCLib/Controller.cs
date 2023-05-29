@@ -334,10 +334,12 @@ public class Controller : IDisposable {
         Task.Factory.StartNew(() => new Consumer(this).Run()),
         Task.Factory.StartNew(() => new Keepalive(this).Run()),
         Task.Factory.StartNew(() => new Commander(this).Run()),
-        Task.Factory.StartNew(() => new Streamer(this).Run())
+        //Task.Factory.StartNew(() => new Streamer(this).Run()),
+        Task.Factory.StartNew(() => new Notifier(this).Run())
       },
       (task) => reconnect(task)
     );
+    Task.Factory.StartNew(() => new Streamer(this).Run());
     Log.sys("Subtasks started.");
   }
   /// <summary>
@@ -453,6 +455,7 @@ public class Controller : IDisposable {
     if (status == ControlState.Stopping) return;
     _status = ControlState.Restart;
     Log.sys("Reconnecting...");
+    Log.debug("Last task: " + tsk.Status.ToString());
     
     await KillAll();
     await doAWait(3, 1000);

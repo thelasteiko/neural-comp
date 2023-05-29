@@ -12,7 +12,7 @@ static int ReadChoice() {
 }
 
 // initialize log that prints to console
-Log.instance(Log.Levels.SysMsg);
+Log.instance(Log.Levels.Debug);
 Log.sys("Log initialized. Starting...");
 
 Controller c = new();
@@ -28,9 +28,21 @@ Console.CancelKeyPress += async delegate {
 Log.sys("Press CTRL+C to exit anytime.");
 
 // add event listener for stream events
-c.Stream += (o, e) => {
-  //Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
-  Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
+// c.StreamData += (o, e) => {
+//   //Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
+//   Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
+// };
+c.StreamStarted += (o, e) => {
+  Console.WriteLine("Stream started.");
+};
+c.StreamStopped += (o, e) => {
+  Console.WriteLine("Stream stopped.");
+};
+c.TherapyStarted += (o, e) => {
+  Console.WriteLine("Therapy started.");
+};
+c.TherapyStopped += (o, e) => {
+  Console.WriteLine("Therapy stopped.");
 };
 
 bool running = true;
@@ -43,7 +55,7 @@ Task t = new(async () => {
       if (c.status == Controller.ControlState.Error)
         await c.stop();
       Log.debug("1 Status is " + c.status.ToString());
-      await c.doAWait(steps:10, sleepFor:500);
+      await Controller.doAWait(steps:10, sleepFor:500);
       await c.start();
       if (!c.IsRunning())
         await c.stop();
@@ -54,7 +66,7 @@ Task t = new(async () => {
 string menu = "Options:\n\t1. Start Stream\n\t2. Stop Stream\n\t3. Quit";
 Log.sys(menu);
 Log.sys("Please wait...");
-await c.doAWait(6, 500);
+await Controller.doAWait(6, 500);
 // start task and wait for user input
 t.Start();
 while(running) {

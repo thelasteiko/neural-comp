@@ -414,6 +414,7 @@ public class PackFactory {
       _pack = new();
       current_byte = 0;
       reset = false;
+      // TODO this is hacky
       if (failed_byte == Package.Header[0]) {
         build(failed_byte);
         failed_byte = 0;
