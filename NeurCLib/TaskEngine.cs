@@ -155,6 +155,11 @@ internal class Keepalive : TaskEngine {
   protected override void runner() {
     Package? p;
     if(last_keepalive > 0 && controller.q_keepalive.TryDequeue(out p)) {
+      Log.debug("Stream is " + controller.StreamTask?.Status.ToString());
+      if (controller.StreamTask != null && controller.StreamTask?.Status == TaskStatus.Faulted) {
+        Exception e2 = controller.StreamTask.Exception;
+        Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
+      }
       if (p.packetID != last_keepalive) {
         Log.warn($"Keepalive mismatch: {p.packetID} <> {last_keepalive}");
       } else {
@@ -439,8 +444,9 @@ internal class Streamer : TaskEngine {
       if (window.PredictReady) {
         // Log.debug("window is prediction ready");
         seizure_detected = window.predict();
+        //controller.SendKill();
       }
-      Log.debug("Controller is stimming: " + controller.IsStimming.ToString());
+      // Log.debug("Controller is stimming: " + controller.IsStimming.ToString());
       if (seizure_detected && !controller.IsStimming) {
         controller.startTherapy();
       }

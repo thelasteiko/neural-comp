@@ -317,6 +317,7 @@ public class Controller : IDisposable {
       }
     }
   }
+  internal Task? StreamTask;
   /// <summary>
   /// Creates independent threads for each task.
   /// <list type="bullet">
@@ -339,7 +340,7 @@ public class Controller : IDisposable {
       },
       (task) => reconnect(task)
     );
-    Task.Factory.StartNew(() => new Streamer(this).Run());
+    StreamTask = Task.Factory.StartNew(() => new Streamer(this).Run());
     Log.sys("Subtasks started.");
   }
   /// <summary>

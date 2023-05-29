@@ -120,32 +120,32 @@ public class SignalWindow {
     _count++;
   }
   public bool predict() {
-    Log.debug("predicting");
+    //Log.debug("predicting");
+    //Console.WriteLine("FOURIER");
     if (q_signal.Count < max_signal_size) return false;
-    Log.debug("window is big enough");
+    //Log.debug("window is big enough");
     current_sample = 0;
-    double[] signal = new double[178+2];
-    Array.Copy(q_signal.ToArray(), signal, 178);
-    signal[178] = 0.0;
-    signal[179] = 0.0;
+    double[] signal = q_signal.ToArray();
+    // Array.Copy(q_signal.ToArray(), signal, 178);
+    // signal[178] = 0.0;
+    // signal[179] = 0.0;
     double[] signalComplex = new double[max_signal_size];
-    Log.debug("input:", signal);
-    //Fourier.Forward(signal, signalComplex, FourierOptions.NoScaling);
-    //Fourier.ForwardReal(signal, 178, FourierOptions.NoScaling);
-    // double sum = 0.0;
-    // double[] logit = new double[weight_size];
-    // for (int i = 0; i <= weight_size; i++) {
-    //   double psd = Math.Sqrt(signal[i] * signal[i] + signalComplex[i] * signalComplex[i]);
-    //   logit[i] = psd;
-    //   sum += weights[i] * psd;
-    // }
-    // Log.debug("Power density:", logit);
-    // if (q_predictions.Count >= max_predict_size) q_predictions.Dequeue();
-    // if (sum + intercept > 0) {
-    //   q_predictions.Enqueue(1);
-    //   return true;
-    // }
-    // q_predictions.Enqueue(-1);
+    //Log.debug("input:", signal);
+    Fourier.Forward(signal, signalComplex, FourierOptions.NoScaling);
+    double sum = 0.0;
+    //double[] logit = new double[weight_size];
+    for (int i = 0; i < weight_size; i++) {
+      double psd = Math.Sqrt(signal[i] * signal[i] + signalComplex[i] * signalComplex[i]);
+      //logit[i] = psd;
+      sum += weights[i] * psd;
+    }
+    //Log.debug("Power density:", logit);
+    if (q_predictions.Count >= max_predict_size) q_predictions.Dequeue();
+    if (sum + intercept > 0) {
+      q_predictions.Enqueue(1);
+      return true;
+    }
+    q_predictions.Enqueue(-1);
     return false;
   }
   /// <summary>
