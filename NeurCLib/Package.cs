@@ -79,9 +79,9 @@ public enum ErrorType {
   BadPackType,
   BadOpCode,
   AlreadyConnected,
+  NotConnected,
   AlreadyStreaming,
   AlreadyStopped,
-  NotConnected,
   AlreadyTherapy,
   AlreadyNotTherapy,
   Unknown

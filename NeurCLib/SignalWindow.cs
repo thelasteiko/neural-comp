@@ -1,12 +1,21 @@
 using MathNet.Numerics.IntegralTransforms;
 namespace NeurCLib;
 /// <summary>
-/// Stores a window of the signal received from the arduino.
+/// Stores a window of the signal received from the arduino and calculates predictions
+/// based on stored weights.
 /// </summary>
 public class SignalWindow {
-  Queue<double> q_signal = new();
-  Queue<int> q_predictions = new();
-  double[] weights = new double[] {
+  /// <summary>
+  /// The signal data.
+  /// </summary>
+  /// <returns></returns>
+  private Queue<double> q_signal = new();
+  /// <summary>
+  /// List of integers representing the last few predictions made.
+  /// </summary>
+  /// <returns></returns>
+  private Queue<int> q_predictions = new();
+  private double[] weights = new double[] {
     1.3870019465068615e-05, 4.313564569348816e-05, 9.892837395098251e-05, 
     5.934895117985429e-05, 4.1657575626930166e-05, 6.738527154134303e-05, 
     0.00014213989886547365, 0.00010700766577817803, 5.2750525304857835e-05, 
@@ -24,7 +33,7 @@ public class SignalWindow {
     -0.0004296078735828951, -3.361403775658161e-05, -0.00047378175439483235, 
     -0.0010855225502114604
   };
-  double[] test_signal = new double[] {
+  private double[] test_signal = new double[] {
     17.999267578125, 19.01922607421875, 38.9984130859375, 
     40.01837158203125, 28.01885986328125, 2.9998779296875, 
     -13.01947021484375, -16.97930908203125, -8.9996337890625, 
@@ -86,16 +95,30 @@ public class SignalWindow {
     -10.01959228515625, 2.9998779296875, -8.9996337890625, 
     -29.998779296875
   };
-  double intercept = -4.204528957411403;
-  int max_signal_size = 178;
-  int max_predict_size = 4;
-  int weight_size = 45;
+  private double intercept = -4.204528957411403;
+  /// <summary>
+  /// Max size of the window.
+  /// </summary>
+  private int max_signal_size = 178;
+  /// <summary>
+  /// Max number of predictions to save.
+  /// </summary>
+  private int max_predict_size = 5;
+  private int weight_size = 45;
   /// <summary>
   /// Make a prediction every # of inputs
   /// </summary>
-  int sample_rate = 50;
-  int current_sample = 0;
-  bool predict_ready = false;
+  private int sample_rate = 40;
+  /// <summary>
+  /// The current sample in relation to the sample_rate
+  /// </summary>
+  private int current_sample = 0;
+  private bool predict_ready = false;
+  /// <summary>
+  /// There are enough data points saved to make a prediction and there have been
+  /// at least sample_rate number of samples since the last prediction.
+  /// </summary>
+  /// <value></value>
   public bool PredictReady {
     get => predict_ready && q_signal.Count >= max_signal_size;
   }
@@ -119,6 +142,10 @@ public class SignalWindow {
     }
     _count++;
   }
+  /// <summary>
+  /// Predict if we have a seizure.
+  /// </summary>
+  /// <returns>True if there is a seizure detected, false if not.</returns>
   public bool predict() {
     //Log.debug("predicting");
     //Console.WriteLine("FOURIER");
@@ -152,7 +179,7 @@ public class SignalWindow {
   /// Calculate the confidence level of the current prediction given prior predictions.
   /// </summary>
   /// <returns></returns>
-  private double confidence() {
+  public double confidence() {
     double sum = 0;
     double wi = 1.0 / (double) max_predict_size;
     double w = wi;

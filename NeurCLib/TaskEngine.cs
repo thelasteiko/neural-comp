@@ -75,6 +75,10 @@ internal class TaskEngine {
       lock(state_lock) {__state = value;}
     }
   }
+  private Task<TaskState>? _worker;
+  public Task<TaskState>? worker {
+    get => _worker;
+  }
   /// <summary>
   /// Current state of the task.
   /// </summary>
@@ -116,20 +120,24 @@ internal class TaskEngine {
     _state = TaskState.KillOrder;
   }
   /// <summary>
-  /// Runs until told to stop. Should be called within it's own thread.
+  /// Creates and starts a task that will run until this object is sent the kill order,
+  /// or until an exception occurs.
   /// </summary>
   /// <returns>The final state of the task</returns>
-  public TaskState Run() {
-    _state = TaskState.Running;
-    Log.debug($"Task '{_name}' running.");
-    controller.task_bag.TryAdd(name, this);
-    while (state == TaskState.Running || FinishWorkOnKill) {
-      //Log.debug($"Task '{_name}' on thread {Thread.CurrentThread.ManagedThreadId}");
-      runner();
-    }
-    // if we break out, remove from bag
-    controller.task_bag.TryRemove(name, out _);
-    return state;
+  public Task<TaskState> Run() {
+    _worker = Task.Factory.StartNew<TaskState>(() => {
+      _state = TaskState.Running;
+      Log.debug($"Task '{_name}' running.");
+      //controller.taskBag.TryAdd(this);
+      while ((state == TaskState.Running || FinishWorkOnKill) && state != TaskState.Error) {
+        //Log.debug($"Task '{_name}' on thread {Thread.CurrentThread.ManagedThreadId}");
+        runner();
+      }
+      // if we break out, remove from bag
+      controller.taskBag.TryRemove(this);
+      return state;
+    });
+    return _worker;
   }
   protected virtual void runner() {
     throw new NotImplementedException();
@@ -153,13 +161,10 @@ internal class Keepalive : TaskEngine {
     last_returned = true;
   }
   protected override void runner() {
+    // do a thread check
+    controller.taskBag.Check();
     Package? p;
     if(last_keepalive > 0 && controller.q_keepalive.TryDequeue(out p)) {
-      Log.debug("Stream is " + controller.StreamTask?.Status.ToString());
-      if (controller.StreamTask != null && controller.StreamTask?.Status == TaskStatus.Faulted) {
-        Exception e2 = controller.StreamTask.Exception;
-        Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
-      }
       if (p.packetID != last_keepalive) {
         Log.warn($"Keepalive mismatch: {p.packetID} <> {last_keepalive}");
       } else {
@@ -168,10 +173,10 @@ internal class Keepalive : TaskEngine {
       last_returned = true;
     }
     if (!last_returned) {
-      Log.critical("Missed keepalive, retrying.");
+      Log.critical($"Missed keepalive # {last_keepalive}, retrying.");
     }
     p = new(PackType.Transaction, OpCode.Keepalive);
-    Log.debug("Sending keepalive.");
+    Log.debug("Sending keepalive.", p.toStream());
     //check before writing
     if (state == TaskState.KillOrder) {
       Log.sys("Killing keepalive");
@@ -209,7 +214,7 @@ internal class Listener : TaskEngine {
       // go until we build or fail
       while (!pf.IsReady) {
         if (controller.porter.BytesToRead > 0) {
-          // Log.debug("Bytes: " + controller.porter.BytesToRead.ToString());
+          //Log.debug("Bytes: " + controller.porter.BytesToRead.ToString());
           int b = controller.porter.ReadByte();
           if (b >= 0) pf.build((byte) b);
           else break;
@@ -308,6 +313,8 @@ internal class Consumer : TaskEngine {
         controller.sendConnectAsync();
         current_reconnect_attempts++;
       }
+    } else if (errorType.In(ErrorType.AlreadyStreaming, ErrorType.AlreadyStopped, ErrorType.AlreadyTherapy, ErrorType.AlreadyNotTherapy)) {
+      controller.resetSendState();
     }
     Log.critical(report);
     Log.debug("Packet: " + p.ToString(), p.toStream());
@@ -324,6 +331,7 @@ internal class Consumer : TaskEngine {
     } else if (opc.In(OpCode.StartStream, OpCode.StopStream, OpCode.Initial, OpCode.StartStim, OpCode.StopStim)) {
       // Log.debug("Command:", p.toStream());
       controller.q_command_responses.Enqueue(p);
+      controller.q_client_events.Enqueue(p);
     }
   }
   /// <summary>
@@ -418,7 +426,7 @@ internal class Commander : TaskEngine {
       last_command_id = 0;
       last_command = OpCode.Unknown;
     } else {
-      Thread.Sleep(Controller.MIN_TIMEOUT);
+      // Thread.Sleep(Controller.MIN_TIMEOUT);
     }
   }
 }
@@ -440,17 +448,21 @@ internal class Streamer : TaskEngine {
     StreamEventArgs? args;
     if (controller.q_stream.TryDequeue(out args)) {
       window.add(args.microvolts);
-      Log.debug($"Added signal # {window.Count}: {args.microvolts}");
+      //Log.debug($"Added signal # {window.Count}: {args.microvolts}");
       if (window.PredictReady) {
         // Log.debug("window is prediction ready");
         seizure_detected = window.predict();
         //controller.SendKill();
       }
-      // Log.debug("Controller is stimming: " + controller.IsStimming.ToString());
-      if (seizure_detected && !controller.IsStimming) {
+      double c = window.confidence();
+      //Log.debug($"Seizure {seizure_detected}, confidence is {c}, stimming is {controller.IsStimming}");
+      if (seizure_detected && c > 0.0 && !controller.IsStimming) {
+        //Log.write("start")
         controller.startTherapy();
+      } else if (!seizure_detected && c < 0.0 && controller.IsStimming) {
+        controller.stopTherapy();
       }
-      FileLog.write(args, seizure_detected, controller.IsStimming);
+      FileLog.write(args, seizure_detected, controller.IsStimming, c);
     } else if (state == TaskState.Running) {
       Thread.Sleep(Controller.MIN_TIMEOUT);
     } else if (state == TaskState.KillOrder) {

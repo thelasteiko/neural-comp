@@ -108,7 +108,7 @@ public class Controller : IDisposable {
   /// Holds the currently running tasks.
   /// </summary>
   /// <returns></returns>
-  internal ConcurrentDictionary<String, TaskEngine> task_bag = new();
+  internal TaskBag taskBag = new();
   private ControlState _status;
   /// <summary>
   /// Current state of the control object.
@@ -193,8 +193,7 @@ public class Controller : IDisposable {
   /// </summary>
   /// <returns></returns>
   public bool IsRunning() {
-    return (status.In(ControlState.Running, ControlState.Restart) &&
-      PriorityState() <= TaskEngine.TaskState.Running);
+    return (status.In(ControlState.Running, ControlState.Restart));
   }
   /// <summary>
   /// Clear all the queues.
@@ -205,48 +204,19 @@ public class Controller : IDisposable {
     q_commands.Clear();
     q_command_responses.Clear();
     q_stream.Clear();
-  }
-  /// <summary>
-  /// Tries to find the named task. If the task exists, sets tsk equal to it.
-  /// </summary>
-  /// <param name="name">Name of the task</param>
-  /// <param name="tsk"></param>
-  /// <returns>Returns true if the task exists and tsk is not null. False otherwise.</returns>
-  internal bool TryFindTask(String name, out TaskEngine? tsk) {
-    if (task_bag.ContainsKey(name)) {
-      tsk = task_bag[name];
-      return true;
-    }
-    tsk = null;
-    return false;
-  }
-  /// <summary>
-  /// Iterates through the existing tasks and sends the kill order.
-  /// Tasks will complete before removing themselves.
-  /// </summary>
-  internal void SendKill() {
-    foreach (var tsk in task_bag) {
-      tsk.Value.Kill();
-    }
-  }
-  /// <summary>
-  /// Gets the max state of all running tasks.
-  /// </summary>
-  /// <returns></returns>
-  internal TaskEngine.TaskState PriorityState() {
-    TaskEngine.TaskState ts = TaskEngine.TaskState.Created;
-    foreach (var tsk in task_bag) {
-      if(tsk.Value.state > ts) ts = tsk.Value.state;
-    }
-    return ts;
+    q_client_events.Clear();
   }
   /// <summary>
   /// Indicates whether there are any tasks in the task bag still alive.
   /// </summary>
   /// <returns></returns>
   internal bool IsAlive() {
-    return task_bag.Count > 0;
+    return taskBag.Count > 0;
   }
+  /// <summary>
+  /// Generalized method for handling user events without arguments.
+  /// </summary>
+  /// <param name="ev"></param>
   private void handleEvent(EventHandler? ev) {
     if (ev is not null) {
       Delegate[] degs = ev.GetInvocationList();
@@ -268,15 +238,27 @@ public class Controller : IDisposable {
       }
     }
   }
+  /// <summary>
+  /// Notify the client that the stream has started.
+  /// </summary>
   internal void handleOnStreamStart() {
     handleEvent(StreamStarted);
   }
+  /// <summary>
+  /// Notify the client that the stream has stopped.
+  /// </summary>
   internal void handleOnStreamStop() {
     handleEvent(StreamStopped);
   }
+  /// <summary>
+  /// Notify the client that therapy started.
+  /// </summary>
   internal void handleOnTherapyStart() {
     handleEvent(TherapyStarted);
   }
+  /// <summary>
+  /// Notify the client that therapy stopped.
+  /// </summary>
   internal void handleOnTherapyStop() {
     handleEvent(TherapyStopped);
   }
@@ -317,7 +299,7 @@ public class Controller : IDisposable {
       }
     }
   }
-  internal Task? StreamTask;
+  //internal Task? StreamTask;
   /// <summary>
   /// Creates independent threads for each task.
   /// <list type="bullet">
@@ -330,17 +312,17 @@ public class Controller : IDisposable {
   /// If any task fails and exits, the controller attempts a reconnect.
   /// </summary>
   private void spawnTasks() {
-    Task.Factory.ContinueWhenAny(new Task[] {
-        Task.Factory.StartNew(() => new Listener(this).Run()),
-        Task.Factory.StartNew(() => new Consumer(this).Run()),
-        Task.Factory.StartNew(() => new Keepalive(this).Run()),
-        Task.Factory.StartNew(() => new Commander(this).Run()),
-        //Task.Factory.StartNew(() => new Streamer(this).Run()),
-        Task.Factory.StartNew(() => new Notifier(this).Run())
-      },
+    taskBag.TryAdd(new Listener(this));
+    taskBag.TryAdd(new Consumer(this));
+    taskBag.TryAdd(new Keepalive(this));
+    taskBag.TryAdd(new Commander(this));
+    taskBag.TryAdd(new Streamer(this));
+    taskBag.TryAdd(new Notifier(this));
+    Task[] tasks = taskBag.StartAll();
+    Task.Factory.ContinueWhenAny(tasks,
       (task) => reconnect(task)
     );
-    StreamTask = Task.Factory.StartNew(() => new Streamer(this).Run());
+    //StreamTask = Task.Factory.StartNew(() => new Streamer(this).Run());
     Log.sys("Subtasks started.");
   }
   /// <summary>
@@ -421,6 +403,8 @@ public class Controller : IDisposable {
   /// Resend initial connect command after a simulated disconnect.
   /// </summary>
   internal void sendConnectAsync() {
+    Log.debug("Sending intial connect.");
+    ClearQueues();
     q_commands.Enqueue(OpCode.Initial);
     // reset state
     _IsStimming = false;
@@ -436,7 +420,7 @@ public class Controller : IDisposable {
   /// </summary>
   /// <returns></returns>
   private async Task KillAll() {
-    SendKill();
+    taskBag.KillAll();
     await Task.Factory.StartNew(() => {
       int counter = 0;
       while (IsAlive() && counter < KillTimeout) {
@@ -444,7 +428,7 @@ public class Controller : IDisposable {
         Thread.Sleep(10);
       }
       if (IsAlive())
-        Log.warn("Old tasks still running. Queue: " + q_all.Count);
+        Log.warn("Old tasks still running. Tasks: " + taskBag.Count);
     });
   }
   /// <summary>
@@ -491,6 +475,11 @@ public class Controller : IDisposable {
   public async Task stop() {
     if (status == ControlState.Created) return;
     _status = ControlState.Stopping;
+    if (IsStreaming) {
+      stopStreaming();
+      Log.sys("Stopping stream...");
+      await doAWait(5, 400);
+    }
     await KillAll();
     if (porter is not null && porter.IsOpen) {
       porter.Close();
@@ -508,10 +497,10 @@ public class Controller : IDisposable {
       Log.critical("Cannot execute; Controller not running.");
       return false;
     }
-    if (PriorityState() > TaskEngine.TaskState.Running) {
-      Log.critical("Cannot execute; Tasks are recovering.");
-      return false;
-    }
+    // if (PriorityState() > TaskEngine.TaskState.Running) {
+    //   Log.critical("Cannot execute; Tasks are recovering.");
+    //   return false;
+    // }
     // ya know the arduino is not reliable
     // if (streaming && IsStreaming) {
     //   Log.critical("Cannot execute; already streaming.");
@@ -567,10 +556,11 @@ public class Controller : IDisposable {
     }
     StartStimSent = true;
     q_commands.Enqueue(OpCode.StartStim);
+    Log.debug("Start therapy sent.");
   }
   public void stopTherapy() {
     if (StopStimSent) {
-      Log.debug("Stop Stime command already sent.");
+      Log.debug("Stop Stim command already sent.");
       return;
     }
     if (!IsStimming) {
@@ -579,6 +569,13 @@ public class Controller : IDisposable {
     }
     StopStimSent = true;
     q_commands.Enqueue(OpCode.StopStim);
+    Log.debug("Stop therapy sent.");
+  }
+  public void resetSendState() {
+    StartStreamSent = false;
+    StopStreamSent = false;
+    StartStimSent = false;
+    StopStimSent = false;
   }
   /// <summary>
   /// Kills any running tasks, closes the port and log if open.

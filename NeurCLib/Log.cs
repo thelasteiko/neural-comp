@@ -204,7 +204,7 @@ public sealed class Log {
 /// Ensures log files do not exceed 2MB.
 /// Filename format: <date>-<time>-<iteration>.csv
 /// If log level is Debug...
-/// Record format: <log timestamp>,<packet timestamp>,<microvolts>,<classification>,<therapy>
+/// Record format: <log timestamp>,<packet timestamp>,<microvolts>,<classification>,<therapy>,<confidence>
 /// If log level is SysMsg...
 /// Record format: <packet timestamp>,<microvolts>,<classification>,<therapy>
 /// </summary>
@@ -268,9 +268,13 @@ internal sealed class FileLog : IDisposable{
   /// Write the stream data to the log file.
   /// </summary>
   /// <param name="args"></param>
-  public void _write(StreamEventArgs args, bool seizure_detected, bool therapy_on) {
+  public void _write(StreamEventArgs args, bool seizure_detected, bool therapy_on, string msg="") {
     // format packet data
-    _write($"{args.timestamp},{args.microvolts},{seizure_detected},{therapy_on}");
+    if (Log.instance().LogLevel >= Log.Levels.Debug) {
+      _write($"{args.timestamp},{args.microvolts},{seizure_detected},{therapy_on},{msg}");
+    } else {
+      _write($"{args.timestamp},{args.microvolts},{seizure_detected},{therapy_on}");
+    }
   }
   /// <summary>
   /// Close the log and dispose the stream writer.
@@ -300,12 +304,19 @@ internal sealed class FileLog : IDisposable{
   public static void create() {
     instance()._create();
   }
+  
+  public static void write(string msg) {
+    instance()._write(msg);
+  }
   /// <summary>
   /// Write the stream data to the log file.
   /// </summary>
   /// <param name="args"></param>
   public static void write(StreamEventArgs args, bool seizure_detected, bool therapy_on) {
     instance()._write(args, seizure_detected, therapy_on);
+  }
+  public static void write(StreamEventArgs args, bool seizure_detected, bool therapy_on, double confidence_level) {
+    instance()._write(args, seizure_detected, therapy_on, confidence_level.ToString());
   }
   /// <summary>
   /// Close the log and dispose the stream writer.

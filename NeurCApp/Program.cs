@@ -54,16 +54,17 @@ Task t = new(async () => {
     if(!c.IsRunning()) {
       if (c.status == Controller.ControlState.Error)
         await c.stop();
-      Log.debug("1 Status is " + c.status.ToString());
+      Log.debug("Controller status is " + c.status.ToString());
       await Controller.doAWait(steps:10, sleepFor:500);
       await c.start();
       if (!c.IsRunning())
         await c.stop();
     }
+    Thread.Sleep(10);
   }
 });
 // show menu, wait a bit so user can read it
-string menu = "Options:\n\t1. Start Stream\n\t2. Stop Stream\n\t3. Quit";
+string menu = "Options:\n\t1. Start Stream\n\t2. Stop Stream\n\t3. Start Therapy\n\t4. Stop Therapy\n\t5. Quit";
 Log.sys(menu);
 Log.sys("Please wait...");
 await Controller.doAWait(6, 500);
@@ -72,12 +73,12 @@ t.Start();
 while(running) {
   int choice = ReadChoice();
   Log.debug("Choice is " + choice.ToString());
-  // if (choice == 1) c.toggleStream();
-  // else running = false;
   if (c.IsRunning()) {
     if (choice == 1) c.startStreaming();
     else if (choice == 2) c.stopStreaming();
-    else if (choice == 3) running = false;
+    else if (choice == 3) c.startTherapy();
+    else if (choice == 4) c.stopTherapy();
+    else if (choice == 5) running = false;
     else {
       Log.sys(menu);
     }
