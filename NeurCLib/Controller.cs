@@ -221,7 +221,7 @@ public class Controller : IDisposable {
     if (ev is not null) {
       Delegate[] degs = ev.GetInvocationList();
       for (int i = 0; i < degs.Length; i++) {
-        degs[i].DynamicInvoke(this);
+        degs[i].DynamicInvoke(this, null);
       }
     }
   }
@@ -441,7 +441,11 @@ public class Controller : IDisposable {
     _status = ControlState.Restart;
     Log.sys("Reconnecting...");
     Log.debug("Last task: " + tsk.Status.ToString());
-    
+    if (tsk.Status == TaskStatus.Faulted) {
+      Exception e2 = tsk.Exception;
+      Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
+      Log.critical(e2.StackTrace ?? "StackTrace not available");
+    }
     await KillAll();
     await doAWait(3, 1000);
     // reconnect
@@ -474,12 +478,12 @@ public class Controller : IDisposable {
   /// <returns></returns>
   public async Task stop() {
     if (status == ControlState.Created) return;
-    _status = ControlState.Stopping;
     if (IsStreaming) {
       stopStreaming();
       Log.sys("Stopping stream...");
       await doAWait(5, 400);
     }
+    _status = ControlState.Stopping;
     await KillAll();
     if (porter is not null && porter.IsOpen) {
       porter.Close();

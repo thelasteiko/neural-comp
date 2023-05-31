@@ -391,6 +391,7 @@ internal class Commander : TaskEngine {
           return;
         }
         controller.Write(p.toStream(), p.length);
+        // Log.debug("command written");
         last_command_id = p.packetID;
         last_command = op;
       }
@@ -456,10 +457,10 @@ internal class Streamer : TaskEngine {
       }
       double c = window.confidence();
       //Log.debug($"Seizure {seizure_detected}, confidence is {c}, stimming is {controller.IsStimming}");
-      if (seizure_detected && c > 0.0 && !controller.IsStimming) {
+      if (seizure_detected && c >= 0.0 && !controller.IsStimming) {
         //Log.write("start")
         controller.startTherapy();
-      } else if (!seizure_detected && c < 0.0 && controller.IsStimming) {
+      } else if (!seizure_detected && c <= 0.0 && controller.IsStimming) {
         controller.stopTherapy();
       }
       FileLog.write(args, seizure_detected, controller.IsStimming, c);

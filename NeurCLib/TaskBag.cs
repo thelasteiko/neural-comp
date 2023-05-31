@@ -2,18 +2,36 @@ using System.Collections.Concurrent;
 using System.Linq;
 
 namespace NeurCLib;
+/// <summary>
+/// Convenience object for controlling and tracking threaded tasks.
+/// </summary>
 internal class TaskBag {
+  /// <summary>
+  /// Thread-safe dictionary of tasks.
+  /// </summary>
+  /// <returns></returns>
   private ConcurrentDictionary<String, TaskEngine> bag = new();
-
+  /// <summary>
+  /// Number of tasks in the bag.
+  /// </summary>
+  /// <value></value>
   public int Count {
     get => bag.Count;
   }
-
+  /// <summary>
+  /// Checks if the task already exists, kills and removes it if it does, and
+  /// adds the given task.
+  /// </summary>
+  /// <param name="tsk">The task to add. The task must have the name property defined.</param>
+  /// <returns>True if the task was added successfully</returns>
   public bool TryAdd(TaskEngine tsk) {
     TaskEngine? te;
     if (TryFindTask(tsk.name, out te)) {
+      // te must be not-null here
+      #pragma warning disable CS8604
       te?.Kill();
       return bag.TryUpdate(tsk.name, tsk, te);
+      #pragma warning restore CS8604
     }
     return bag.TryAdd(tsk.name, tsk);
   }
@@ -43,9 +61,12 @@ internal class TaskBag {
     foreach(var n in bag) {
       TaskEngine tsk = n.Value;
       if (tsk.worker is not null && tsk.worker.Status == TaskStatus.Faulted) {
+        // exception must exist for faulted task status
+        #pragma warning disable CS8600, CS8602
         Exception e2 = tsk.worker.Exception;
         Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
-        Log.critical(e2.StackTrace);
+        Log.critical(e2.StackTrace ?? "StackTrace not available");
+        #pragma warning restore CS8600, CS8602
         // remove since it won't exit normally
         bag.TryRemove(n);
       } else if (tsk.state == TaskEngine.TaskState.Error) {
@@ -53,7 +74,10 @@ internal class TaskBag {
       }
     }
   }
-
+  /// <summary>
+  /// Iterates through the bag and calls the Run function for all tasks.
+  /// </summary>
+  /// <returns>The list of worker tasks created by the Run functions</returns>
   public Task[] StartAll() {
     Task[] tasks = new Task[Count];
     int i = 0;

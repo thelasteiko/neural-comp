@@ -39,4 +39,4 @@ The app just links to the dll in the debug folder of the library. Make sure to b
 
 The log saves the actual state of delivering therapy as given by the device, not the intended state. There may be a disconnect between the seizure state detected and the therapy state, particularly when seizure detection state is switching. This is expected as the confidence in the detection grows.
 
-While the device responds quickly to starting therapy, it delays in responding to stopping therapy.
+While the device responds quickly to starting therapy, it delays in responding to the stop therapy command. Setting the log level to debug will show the confidence level and the timelapse between sending the command the device's response. The command to start therapy is sent when the confidence level is above 0 and the command to stop therapy is sent when the confidence level is below 0.

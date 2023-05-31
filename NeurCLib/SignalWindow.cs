@@ -103,12 +103,12 @@ public class SignalWindow {
   /// <summary>
   /// Max number of predictions to save.
   /// </summary>
-  private int max_predict_size = 5;
+  private int max_predict_size = 3;
   private int weight_size = 45;
   /// <summary>
   /// Make a prediction every # of inputs
   /// </summary>
-  private int sample_rate = 40;
+  private int sample_rate = 20;
   /// <summary>
   /// The current sample in relation to the sample_rate
   /// </summary>
@@ -123,14 +123,22 @@ public class SignalWindow {
     get => predict_ready && q_signal.Count >= max_signal_size;
   }
   private int _count = 0;
+  /// <summary>
+  /// Total number of data points received since creation.
+  /// Not the size of the window.
+  /// </summary>
+  /// <value></value>
   public int Count {
     get => _count;
   }
-  public SignalWindow() {
-    //weights = new double[weight_size];
-    //intercept = 0.0;
-    // TODO load weights and intercept
-  }
+  /// <summary>
+  /// Add a data point to the signal queue. If the queue is at capacity, equal to max_signal_size,
+  /// this removes a data point before adding the new one.
+  /// 
+  /// If the number of samples since the last prediction is greater or equal to the sample_rate,
+  /// sets predict_ready to true.
+  /// </summary>
+  /// <param name="uv"></param>
   public void add(double uv) {
     if (q_signal.Count >= max_signal_size) {
       q_signal.Dequeue();
@@ -147,11 +155,12 @@ public class SignalWindow {
   /// </summary>
   /// <returns>True if there is a seizure detected, false if not.</returns>
   public bool predict() {
-    //Log.debug("predicting");
+    // Log.debug($"Predicting...sample count={current_sample}");
     //Console.WriteLine("FOURIER");
     if (q_signal.Count < max_signal_size) return false;
     //Log.debug("window is big enough");
     current_sample = 0;
+    predict_ready = false;
     double[] signal = q_signal.ToArray();
     // Array.Copy(q_signal.ToArray(), signal, 178);
     // signal[178] = 0.0;
