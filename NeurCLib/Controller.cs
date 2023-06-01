@@ -221,7 +221,7 @@ public class Controller : IDisposable {
     if (ev is not null) {
       Delegate[] degs = ev.GetInvocationList();
       for (int i = 0; i < degs.Length; i++) {
-        degs[i].DynamicInvoke(this, null);
+        degs[i].DynamicInvoke(this, new EventArgs());
       }
     }
   }
@@ -478,6 +478,11 @@ public class Controller : IDisposable {
   /// <returns></returns>
   public async Task stop() {
     if (status == ControlState.Created) return;
+    q_commands.Clear();
+    if (IsStimming) {
+      stopTherapy();
+      Log.sys("Stopping therapy...");
+    }
     if (IsStreaming) {
       stopStreaming();
       Log.sys("Stopping stream...");
@@ -551,7 +556,7 @@ public class Controller : IDisposable {
 
   public void startTherapy() {
     if (StartStimSent) {
-      Log.debug("Stim command already sent.");
+      // Log.debug("Stim command already sent.");
       return;
     }
     if (IsStimming) {
@@ -564,7 +569,7 @@ public class Controller : IDisposable {
   }
   public void stopTherapy() {
     if (StopStimSent) {
-      Log.debug("Stop Stim command already sent.");
+      // Log.debug("Stop Stim command already sent.");
       return;
     }
     if (!IsStimming) {

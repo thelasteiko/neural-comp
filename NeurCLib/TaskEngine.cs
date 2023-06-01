@@ -220,7 +220,7 @@ internal class Listener : TaskEngine {
           else break;
           if (pf.IsFailed) throw new TimeoutException("Packet factory reset timeout.");
         } else {
-          Thread.Sleep(Controller.MIN_TIMEOUT);
+          //Thread.Sleep(Controller.MIN_TIMEOUT);
         }
       }
     } catch (TimeoutException e) {
@@ -396,7 +396,7 @@ internal class Commander : TaskEngine {
         last_command = op;
       }
     }
-    Thread.Sleep(Controller.MIN_TIMEOUT);
+    // Thread.Sleep(Controller.MIN_TIMEOUT);
     // we are waiting for a command
     if (last_command > 0 && controller.q_command_responses.TryDequeue(out p)) {
       if (p.packetID != last_command_id) {

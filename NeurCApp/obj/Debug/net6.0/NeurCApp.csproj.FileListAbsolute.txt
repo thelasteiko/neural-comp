@@ -51,3 +51,4 @@ c:\Users\memre\Documents\git-repos\neural-comp\NeurCApp\obj\Debug\net6.0\NeurCAp
 c:\Users\memre\Documents\git-repos\neural-comp\NeurCApp\obj\Debug\net6.0\NeurCApp.genruntimeconfig.cache
 c:\Users\memre\Documents\git-repos\neural-comp\NeurCApp\obj\Debug\net6.0\ref\NeurCApp.dll
 c:\Users\memre\Documents\git-repos\neural-comp\NeurCApp\bin\Debug\net6.0\MathNet.Numerics.dll
+c:\temp\neural-comp\NeurCApp\bin\Debug\net6.0\MathNet.Numerics.dll
