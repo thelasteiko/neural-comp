@@ -137,7 +137,8 @@ public sealed class Log {
       [CallerLineNumber] int linenum=0) {
     lock(logmutex) {
       instance()._debug(msg, callerName, filepath, linenum);
-      Console.WriteLine(ByteToString(buffer));
+      if (instance().LogLevel >= Levels.Debug)
+        Console.WriteLine(ByteToString(buffer));
     }
   }
 
@@ -147,7 +148,8 @@ public sealed class Log {
       [CallerLineNumber] int linenum=0) {
     lock(logmutex) {
       instance()._debug(msg, callerName, filepath, linenum);
-      Console.WriteLine("[{0}]", string.Join(", ", ary));
+      if (instance().LogLevel >= Levels.Debug)
+        Console.WriteLine("[{0}]", string.Join(", ", ary));
     }
   }
   public static void warn(string msg,

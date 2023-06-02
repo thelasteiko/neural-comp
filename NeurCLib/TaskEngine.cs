@@ -435,7 +435,7 @@ internal class Commander : TaskEngine {
 /// Processes stream data to save to file and predict if there is a seizure happening.
 /// </summary>
 internal class Streamer : TaskEngine {
-  SignalWindow window = new();
+  SignalWindow window;
   bool seizure_detected;
   /// <summary>
   /// Hands off stream data to the user client via the controller's stream event.
@@ -444,6 +444,7 @@ internal class Streamer : TaskEngine {
   /// <returns></returns>
   public Streamer(Controller ctrl) : base(ctrl, TE_STREAMER) {
     FinishWorkOnKill = true;
+    window = new(controller.SampleRate, controller.MaxPredictSize);
   }
   protected override void runner() {
     StreamEventArgs? args;

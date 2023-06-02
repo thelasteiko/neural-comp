@@ -144,18 +144,30 @@ public class Controller : IDisposable {
     get => _UserStreaming;
   }
   internal bool _IsStimming = false;
+  /// <summary>
+  /// Whether the device has been prompted to administer therapy.
+  /// </summary>
+  /// <value></value>
   public bool IsStimming {
     get => _IsStimming || StartStimSent;
   }
   internal bool StartStimSent = false;
   internal bool StopStimSent = false;
+  private int _SampleRate;
+  public int SampleRate {
+    get => _SampleRate;
+  }
+  private int _MaxPredictionSize;
+  public int MaxPredictSize {
+    get => _MaxPredictionSize;
+  }
   private bool disposed = false;
   #endregion
   /// <summary>
   /// Creates a new controller for interacting with the arduino.
   /// Creates but does not open the serial port.
   /// </summary>
-  public Controller() {
+  public Controller(Log.Levels LogLevel=Log.Levels.SysMsg, int sample_rate=2, int max_predict_size=5) {
     porter = new SerialPort{
       BaudRate = 115200,
       DataBits = 8,
@@ -164,6 +176,13 @@ public class Controller : IDisposable {
       WriteTimeout = 500,
       ReadTimeout = MAX_TIMEOUT
     };
+
+    // initialize log that prints to console
+    Log.instance(Log.Levels.SysMsg);
+    Log.sys("Log initialized. Starting...");
+
+    _SampleRate = sample_rate;
+    _MaxPredictionSize = max_predict_size;
 
     _IsStreaming = false;
     disposed = false;
@@ -442,9 +461,12 @@ public class Controller : IDisposable {
     Log.sys("Reconnecting...");
     Log.debug("Last task: " + tsk.Status.ToString());
     if (tsk.Status == TaskStatus.Faulted) {
+      // exception must exist for faulted task status
+      #pragma warning disable CS8600, CS8602
       Exception e2 = tsk.Exception;
       Log.critical(String.Format("{0}: {1}", e2.GetType().Name, e2.Message));
       Log.critical(e2.StackTrace ?? "StackTrace not available");
+      #pragma warning restore CS8600, CS8602
     }
     await KillAll();
     await doAWait(3, 1000);
@@ -506,10 +528,6 @@ public class Controller : IDisposable {
       Log.critical("Cannot execute; Controller not running.");
       return false;
     }
-    // if (PriorityState() > TaskEngine.TaskState.Running) {
-    //   Log.critical("Cannot execute; Tasks are recovering.");
-    //   return false;
-    // }
     // ya know the arduino is not reliable
     // if (streaming && IsStreaming) {
     //   Log.critical("Cannot execute; already streaming.");

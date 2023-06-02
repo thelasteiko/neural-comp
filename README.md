@@ -30,6 +30,19 @@ The program pauses for ~3 seconds after showing the menu options.
 
 The manually entered options are there for convenience. The program should run automatically, start/stop both the stream and the therapy independent of the user.
 
+By default the signal is processed every other data point. This is working on the test equipment (aka my computer) but may be too often for other setups. You may change the sample rate and number of predictions from the controller initialization:
+
+```c#
+// default
+Controller c = new(Log.Levels.SysMsg, sample_rate:2, max_predict_size:5);
+
+// example
+Controller c = new(Log.Levels.SysMsg, sample_rate:10, max_predict_size:3);
+```
+
+* sample_rate: Changes how often the prediction runs. A lower sample rate means that the predictions will run more often.
+* max_predict_size: This is the number of prior predictions used to calculate the confidence in the current prediction. A higher predict size will mean that more prior predictions are used, and the longer the program will take to switch between seizure and non-seizure.
+
 ## Expected Output
 The program will start by attempting to connect to the arduino. Once it connects, it will start the stream and begin the logging and interpreting it. Therapy should start/stop upon detection of seizure state.
 
@@ -37,6 +50,6 @@ The program will start by attempting to connect to the arduino. Once it connects
 
 The app just links to the dll in the debug folder of the library. Make sure to build the library before you try to run the app.
 
-The log saves the actual state of delivering therapy as given by the device, not the intended state. There may be a disconnect between the seizure state detected and the therapy state, particularly when seizure detection state is switching. This is expected as the confidence in the detection grows.
+The log saves the actual state of delivering therapy as given by the device, not the intended state. There may be a slight disconnect between the seizure state detected and the therapy state when seizure detection state is switching. This is expected as the confidence in the detection grows.
 
-While the device responds quickly to starting therapy, it delays in responding to the stop therapy command. Setting the log level to debug will show the confidence level and the timelapse between sending the command the device's response. The command to start therapy is sent when the confidence level is above 0 and the command to stop therapy is sent when the confidence level is below 0.
+Confidence will be displayed and logged in debug mode. Set the Log level on the controller to Debug to see it.

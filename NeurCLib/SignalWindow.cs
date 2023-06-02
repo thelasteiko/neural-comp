@@ -127,12 +127,17 @@ public class SignalWindow {
   /// <summary>
   /// Make a prediction every # of inputs
   /// </summary>
-  private int sample_rate = 3;
+  private int sample_rate = 2;
   /// <summary>
   /// The current sample in relation to the sample_rate
   /// </summary>
   private int current_sample = 0;
   private bool predict_ready = false;
+
+  public SignalWindow(int sampleRate, int maxPredictSize) {
+    sample_rate = sampleRate;
+    max_predict_size = maxPredictSize;
+  }
   /// <summary>
   /// There are enough data points saved to make a prediction and there have been
   /// at least sample_rate number of samples since the last prediction.

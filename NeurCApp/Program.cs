@@ -11,11 +11,7 @@ static int ReadChoice() {
   return c;
 }
 
-// initialize log that prints to console
-Log.instance(Log.Levels.SysMsg);
-Log.sys("Log initialized. Starting...");
-
-Controller c = new();
+Controller c = new(Log.Levels.SysMsg, sample_rate:2, max_predict_size:5);
 
 // to handle CTRL+c
 Console.CancelKeyPress += async delegate {
@@ -27,11 +23,11 @@ Console.CancelKeyPress += async delegate {
 
 Log.sys("Press CTRL+C to exit anytime.");
 
-// add event listener for stream events
-c.StreamData += (o, e) => {
-  //Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
-  Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
-};
+// add listeners for events
+// c.StreamData += (o, e) => {
+//   //Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
+//   Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
+// };
 c.StreamStarted += (o, e) => {
   Console.WriteLine("Stream started.");
 };
