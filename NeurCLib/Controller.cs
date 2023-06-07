@@ -523,7 +523,7 @@ public class Controller : IDisposable {
   /// </summary>
   /// <param name="streaming"></param>
   /// <returns></returns>
-  private bool StreamCheck(bool streaming) {
+  private bool StreamCheck() {
     if (status != ControlState.Running) {
       Log.critical("Cannot execute; Controller not running.");
       return false;
@@ -545,7 +545,7 @@ public class Controller : IDisposable {
   /// </summary>
   /// <returns></returns>
   public void startStreaming() {
-    if (!StreamCheck(true)) return;
+    if (!StreamCheck()) return;
     if (StartStreamSent) {
       Log.debug("Start stream already sent.");
       return;
@@ -561,7 +561,7 @@ public class Controller : IDisposable {
   /// </summary>
   /// <returns></returns>
   public void stopStreaming() {
-    if (!StreamCheck(false)) return;
+    if (!StreamCheck()) return;
     if (StopStreamSent) {
       Log.debug("Stop stream already sent.");
       return;
@@ -571,8 +571,11 @@ public class Controller : IDisposable {
     q_commands.Enqueue(OpCode.StopStream);
     Log.sys("Stop stream command sent.");
   }
-
+  /// <summary>
+  /// Start therapy, unless the command to start has already been sent.
+  /// </summary>
   public void startTherapy() {
+    if (!StreamCheck()) return;
     if (StartStimSent) {
       // Log.debug("Stim command already sent.");
       return;
@@ -585,7 +588,11 @@ public class Controller : IDisposable {
     q_commands.Enqueue(OpCode.StartStim);
     Log.debug("Start therapy sent.");
   }
+  /// <summary>
+  /// Stop therapy, unless the command to stop has already been sent.
+  /// </summary>
   public void stopTherapy() {
+    if (!StreamCheck()) return;
     if (StopStimSent) {
       // Log.debug("Stop Stim command already sent.");
       return;

@@ -56,6 +56,10 @@ public enum PackType {
 ///     <description>Already connected, connection request sent more than once</description>
 ///   <item>
 ///   <item>
+///     <term>NotConnected</term>
+///     <description>Cannot respond to control commands because we are not connected</description>
+///   <item>
+///   <item>
 ///     <term>AlreadyStreaming</term>
 ///     <description>Stream already started, start streaming sent more than once</description>
 ///   <item>
@@ -64,8 +68,12 @@ public enum PackType {
 ///     <description>Stream already stopped, stop streaming sent more than once</description>
 ///   <item>
 ///   <item>
-///     <term>NotConnected</term>
-///     <description>Cannot respond to control commands because we are not connected</description>
+///     <term>AlreadyTherapy</term>
+///     <description>Therapy is already being administered</description>
+///   <item>
+///   <item>
+///     <term>AlreadyNotTherapy</term>
+///     <description>Therapy is not being administered</description>
 ///   <item>
 ///   <item>
 ///     <term>Unknown</term>
@@ -105,6 +113,14 @@ public enum ErrorType {
 ///     <term>StopStream</term>
 ///     <description>Stop streaming data</description>
 ///   <item>
+///   <item>
+///     <term>StartStim</term>
+///     <description>Start therapy</description>
+///   </item>
+///   <item>
+///     <term>StopStim</term>
+///     <description>Stop therapy</description>
+///   </item>
 ///   <item>
 ///     <term>Unknown</term>
 ///     <description>Default value</description>

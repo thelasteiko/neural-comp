@@ -228,6 +228,9 @@ internal sealed class FileLog : IDisposable{
   private StreamWriter? log_stream;
   private bool disposed = false;
   private int bytes_written = 0;
+  /// <summary>
+  /// Start a new log file, incrementing the log index.
+  /// </summary>
   private void _incrementLog() {
     log_index++;
     log_path = $"{current_stamp.ToString("yyyyMMdd")}-{current_stamp.ToString("HHmmss")}-{log_index}.csv";
@@ -306,17 +309,21 @@ internal sealed class FileLog : IDisposable{
   public static void create() {
     instance()._create();
   }
-  
-  public static void write(string msg) {
-    instance()._write(msg);
-  }
   /// <summary>
-  /// Write the stream data to the log file.
+  /// Write stream data, seizure, and therapy state to the log file.
   /// </summary>
   /// <param name="args"></param>
   public static void write(StreamEventArgs args, bool seizure_detected, bool therapy_on) {
     instance()._write(args, seizure_detected, therapy_on);
   }
+  /// <summary>
+  /// Write stream data, seizure, and therapy state to the log file. This also includes the
+  /// confidence level for debugging.
+  /// </summary>
+  /// <param name="args"></param>
+  /// <param name="seizure_detected"></param>
+  /// <param name="therapy_on"></param>
+  /// <param name="confidence_level"></param>
   public static void write(StreamEventArgs args, bool seizure_detected, bool therapy_on, double confidence_level) {
     instance()._write(args, seizure_detected, therapy_on, confidence_level.ToString());
   }

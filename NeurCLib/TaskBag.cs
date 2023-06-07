@@ -35,6 +35,11 @@ internal class TaskBag {
     }
     return bag.TryAdd(tsk.name, tsk);
   }
+  /// <summary>
+  /// Try to remove the given task from the bag.
+  /// </summary>
+  /// <param name="tsk"></param>
+  /// <returns>True if the task was removed successfully</returns>
   public bool TryRemove(TaskEngine tsk) {
     return bag.TryRemove(tsk.name, out _);
   }

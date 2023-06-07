@@ -24,10 +24,10 @@ Console.CancelKeyPress += async delegate {
 Log.sys("Press CTRL+C to exit anytime.");
 
 // add listeners for events
-// c.StreamData += (o, e) => {
-//   //Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
-//   Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
-// };
+c.StreamData += (o, e) => {
+  //Log.debug("Thread is " + Thread.CurrentThread.ManagedThreadId.ToString());
+  Console.WriteLine($"Stream data: {e.timestamp}, {e.microvolts}");
+};
 c.StreamStarted += (o, e) => {
   Console.WriteLine("Stream started.");
 };

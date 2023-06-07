@@ -12,9 +12,12 @@ public class StreamEventArgs : EventArgs {
   /// Represents the timestamp part of the data
   /// </summary>
   public ulong timestamp;
+  /// <summary>
+  /// Raw stream data.
+  /// </summary>
   public ushort raw;
   /// <summary>
-  /// Represents the data part
+  /// Transformed stream data
   /// </summary>
   public double microvolts;
   public StreamEventArgs(byte[] payload) {

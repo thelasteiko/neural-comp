@@ -76,6 +76,10 @@ internal class TaskEngine {
     }
   }
   private Task<TaskState>? _worker;
+  /// <summary>
+  /// The task object associated with the engine. This is created when the engine is run.
+  /// </summary>
+  /// <value></value>
   public Task<TaskState>? worker {
     get => _worker;
   }
@@ -121,7 +125,7 @@ internal class TaskEngine {
   }
   /// <summary>
   /// Creates and starts a task that will run until this object is sent the kill order,
-  /// or until an exception occurs.
+  /// or until an exception occurs. The task returned is also the worker task.
   /// </summary>
   /// <returns>The final state of the task</returns>
   public Task<TaskState> Run() {
@@ -335,7 +339,7 @@ internal class Consumer : TaskEngine {
     }
   }
   /// <summary>
-  /// Hands off stream data to the streamer task.
+  /// Hands off stream data to the streamer task and the notifier to send to the client.
   /// </summary>
   /// <param name="p"></param>
   protected void handleStream(Package p) {
@@ -438,7 +442,7 @@ internal class Streamer : TaskEngine {
   SignalWindow window;
   bool seizure_detected;
   /// <summary>
-  /// Hands off stream data to the user client via the controller's stream event.
+  /// Processes stream data to save to file and predict if there is a seizure happening.
   /// </summary>
   /// <param name="ctrl"></param>
   /// <returns></returns>
@@ -472,11 +476,16 @@ internal class Streamer : TaskEngine {
     }
   }
 }
+/// <summary>
+/// Notifies the client of various events, such as start/stop stream, start/stop therapy, and the stream data.
+/// </summary>
 internal class Notifier : TaskEngine {
+  /// <summary>
+  /// Notifies the client of various events, such as start/stop stream, start/stop therapy, and the stream data.
+  /// </summary>
   public Notifier(Controller ctrl) : base(ctrl, TE_NOTIFIER) {
     FinishWorkOnKill = true;
   }
-
   protected override void runner() {
     Package? p;
     if (controller.q_client_events.TryDequeue(out p)) {
